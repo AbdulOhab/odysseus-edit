@@ -13,6 +13,7 @@ import { attachColorPicker } from './colorPicker.js';
 import modalManager from './modalManager.js';
 import { host } from '../app/host.js';
 import * as _aiPlanner from '../app/ai-planner.js';
+import { quickEditAdjustment, matchQuickEditCommand, quickEditNumber as _qeNum, QUICK_EDIT_LABELS } from '../app/quick-edit.js';
 import { canvasCoords as _canvasCoords } from './editor/canvas-coords.js';
 import { drawCheckerboard as _drawCheckerboard } from './editor/checkerboard.js';
 import { dilateMask as _dilateMask, applyInpaintFeather as _applyInpaintFeather } from './editor/mask-utils.js';
@@ -568,102 +569,11 @@ function _openSamPrompt() {
 
 // ── Quick Edit actions ──────────────────────────────────────────────────
 // Odysseus-Edit: built-in commands and the language-model planner both
-// produce a list of actions in one small vocabulary, run here. Adjustments
-// become ordinary adjustment layers, so every step is visible and undoable.
-// Numbers arrive in slider units (mostly -100..100) and are clamped.
+// produce a list of actions in one small vocabulary (../app/quick-edit.js),
+// run here. Adjustments become ordinary adjustment layers, so every step is
+// visible and undoable.
 
 let _runAiUpscale = null;
-
-function _qeNum(value, min, max, fallback) {
-  const n = Number(value);
-  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
-}
-
-function _qeColor(value, fallback) {
-  return /^#[0-9a-f]{6}$/i.test(String(value || '')) ? String(value) : fallback;
-}
-
-function _qeRgb(value) {
-  return {
-    r: _qeNum(value?.r, -100, 100, 0),
-    g: _qeNum(value?.g, -100, 100, 0),
-    b: _qeNum(value?.b, -100, 100, 0),
-  };
-}
-
-// Map a planner action to an adjustment-layer spec, or null if it is not one.
-function _qeAdjustment(action) {
-  const a = action || {};
-  switch (a.type) {
-    case 'brightness_contrast':
-      return { type: 'brightness-contrast', params: {
-        brightness: 1 + _qeNum(a.brightness, -100, 100, 0) / 100,
-        contrast: 1 + _qeNum(a.contrast, -100, 100, 0) / 100,
-      } };
-    case 'exposure':
-      return { type: 'exposure', params: { exposure: _qeNum(a.ev, -5, 5, 0), offset: 0, gamma: 1 } };
-    case 'white_balance':
-      return { type: 'white-balance', params: {
-        temperature: _qeNum(a.temperature, -100, 100, 0),
-        tint: _qeNum(a.tint, -100, 100, 0),
-      } };
-    case 'hue_saturation':
-      return { type: 'hue-saturation', params: {
-        hue: _qeNum(a.hue, -180, 180, 0),
-        saturation: 1 + _qeNum(a.saturation, -100, 100, 0) / 100,
-        lightness: _qeNum(a.lightness, -100, 100, 0),
-      } };
-    case 'vibrance':
-      return { type: 'vibrance', params: { vibrance: _qeNum(a.amount, -100, 100, 0) } };
-    case 'black_white':
-      return { type: 'black-white', params: {} };
-    case 'shadows_highlights':
-      return { type: 'shadows-highlights', params: {
-        shadows: _qeNum(a.shadows, -100, 100, 0),
-        highlights: _qeNum(a.highlights, -100, 100, 0),
-      } };
-    case 'levels': {
-      const black = Math.round(_qeNum(a.black, 0, 253, 0));
-      const white = Math.round(_qeNum(a.white, black + 2, 255, 255));
-      return { type: 'levels', params: {
-        channel: 'rgb', inBlack: black, inWhite: white,
-        gamma: _qeNum(a.gamma, 0.1, 9.9, 1), outBlack: 0, outWhite: 255,
-      } };
-    }
-    case 'curves': {
-      const raw = Array.isArray(a.points) ? a.points : [];
-      const points = raw
-        .filter(pt => Array.isArray(pt) && pt.length === 2)
-        .map(([x, y]) => [Math.round(_qeNum(x, 0, 255, 0)), Math.round(_qeNum(y, 0, 255, 0))])
-        .sort((m, n) => m[0] - n[0])
-        .filter((pt, i, arr) => i === 0 || pt[0] !== arr[i - 1][0])
-        .slice(0, 16);
-      if (!points.length || points[0][0] !== 0) points.unshift([0, 0]);
-      if (points[points.length - 1][0] !== 255) points.push([255, 255]);
-      return { type: 'curves', params: { channel: 'rgb', points: { rgb: points } } };
-    }
-    case 'color_balance': {
-      const params = {};
-      for (const tone of ['shadows', 'midtones', 'highlights']) {
-        if (a[tone] && typeof a[tone] === 'object') params[tone] = _qeRgb(a[tone]);
-      }
-      if (!Object.keys(params).length) {
-        const tone = ['shadows', 'midtones', 'highlights'].includes(a.tone) ? a.tone : 'midtones';
-        params[tone] = _qeRgb(a);
-      }
-      return { type: 'color-balance', params };
-    }
-    case 'gradient_map':
-      return { type: 'gradient-map', params: {
-        shadows: _qeColor(a.shadows, '#000000'),
-        highlights: _qeColor(a.highlights, '#ffffff'),
-        midpoint: _qeNum(a.midpoint, 0, 100, 50),
-        reverse: a.reverse === true,
-      } };
-    default:
-      return null;
-  }
-}
 
 // Add an adjustment layer at the top of the stack so it applies to the
 // whole document, without opening the adjustment popup.
@@ -695,11 +605,6 @@ function _runToolButtonOrThrow(toolId, buttonId, status) {
   return _waitForExistingButton(target);
 }
 
-const _QE_LABELS = {
-  rotate: 'Rotate', flip: 'Flip', remove_background: 'Remove background', upscale: 'Upscale',
-  denoise: 'Denoise', sharpen: 'Sharpen', enhance_face: 'Enhance face', style_edit: 'Style edit',
-};
-
 /**
  * Run Quick Edit actions in order. Stops at the first failure (earlier
  * steps stay applied and can be undone). Unknown action types are skipped.
@@ -710,7 +615,7 @@ async function _runQuickEditActions(actions, runBtn, { summary = '' } = {}) {
   const skipped = [];
   for (const action of list) {
     const type = String(action?.type || '');
-    const adj = _qeAdjustment(action);
+    const adj = quickEditAdjustment(action);
     if (adj) {
       const label = typeof action.label === 'string' && action.label.trim()
         ? action.label.trim().slice(0, 40)
@@ -780,7 +685,7 @@ async function _runQuickEditActions(actions, runBtn, { summary = '' } = {}) {
         skipped.push(type || 'unknown');
         continue;
     }
-    applied.push(_QE_LABELS[type] || type);
+    applied.push(QUICK_EDIT_LABELS[type] || type);
   }
   const parts = [];
   if (summary) parts.push(summary);
@@ -790,55 +695,6 @@ async function _runQuickEditActions(actions, runBtn, { summary = '' } = {}) {
   // Rotations re-layout the canvas on the next frame; report after it.
   requestAnimationFrame(() => _setAiCommandStatus(parts.join(' '), applied.length ? 'done' : 'error'));
   return { applied, skipped };
-}
-
-/**
- * Built-in command matching. strict: only whole, short commands (used even
- * when a language model is configured). Loose: upstream's keyword rules,
- * where anything unmatched becomes a full-image style edit.
- */
-function _matchQuickEditCommand(p, prompt, { strict }) {
-  const text = p.trim().replace(/\s+/g, ' ').replace(/[.!]+$/, '');
-  if (strict) {
-    if (/^rotate( 90| right| clockwise)?$/.test(text)) return [{ type: 'rotate', degrees: 90 }];
-    if (/^rotate (left|ccw|counter ?clockwise|-90|270)$/.test(text)) return [{ type: 'rotate', degrees: 270 }];
-    if (/^(rotate 180|upside down)$/.test(text)) return [{ type: 'rotate', degrees: 180 }];
-    if (/^(flip|mirror)( horizontal(ly)?| h)?$/.test(text)) return [{ type: 'flip', axis: 'h' }];
-    if (/^(flip|mirror) (vertical(ly)?|v)$/.test(text)) return [{ type: 'flip', axis: 'v' }];
-    if (/^remove (the )?(bg|background)$/.test(text)) return [{ type: 'remove_background' }];
-    const up = text.match(/^upscale( (2|4)x)?$/);
-    if (up) return [{ type: 'upscale', scale: up[2] === '4' ? 4 : 2 }];
-    if (text === 'denoise') return [{ type: 'denoise', strength: 0.55 }];
-    if (text === 'sharpen') return [{ type: 'sharpen', amount: 65 }];
-    if (text === 'enhance face') return [{ type: 'enhance_face' }];
-    if (/^(black (and|&) white|b&w|gr[ae]yscale)$/.test(text)) return [{ type: 'black_white' }];
-    if (/^warm(er)?$/.test(text)) return [{ type: 'white_balance', temperature: 25 }];
-    if (/^cool(er)?$/.test(text)) return [{ type: 'white_balance', temperature: -25 }];
-    if (/^bright(er|en)?$/.test(text)) return [{ type: 'brightness_contrast', brightness: 15 }];
-    if (/^dark(er|en)?$/.test(text)) return [{ type: 'brightness_contrast', brightness: -15 }];
-    if (/^more contrast$/.test(text)) return [{ type: 'brightness_contrast', contrast: 20 }];
-    if (/^(vivid|vibrant|more vibrant)$/.test(text)) return [{ type: 'vibrance', amount: 35 }];
-    const style = prompt.trim().match(/^style:\s*(.+)$/i);
-    if (style) return [{ type: 'style_edit', prompt: style[1], strength: 0.55 }];
-    return null;
-  }
-  if (/\brotate\b.*\b180\b|\bupside\s*down\b/.test(p)) return [{ type: 'rotate', degrees: 180 }];
-  if (/\brotate\b.*\b(left|ccw|counter)\b|\bturn\s+left\b/.test(p)) return [{ type: 'rotate', degrees: 270 }];
-  if (/\brotate\b|\bturn\s+right\b|\bclockwise\b/.test(p)) return [{ type: 'rotate', degrees: 90 }];
-  if (/\bflip\b.*\b(vertical|v)\b|\bmirror\b.*\b(vertical|v)\b/.test(p)) return [{ type: 'flip', axis: 'v' }];
-  if (/\bflip\b|\bmirror\b/.test(p)) return [{ type: 'flip', axis: 'h' }];
-  if (/\b(remove|erase|cut\s*out|transparent)\b.*\b(bg|background)\b|\b(bg|background)\b.*\b(remove|erase|transparent)\b/.test(p)) {
-    return [{ type: 'remove_background' }];
-  }
-  if (/\b(upscale|higher\s*res|increase\s*resolution|bigger|2x|4x)\b/.test(p)) {
-    return [{ type: 'upscale', scale: /\b4x\b/.test(p) ? 4 : 2 }];
-  }
-  if (/\b(denoise|noise|grain|grainy|clean\s*up)\b/.test(p)) return [{ type: 'denoise', strength: 0.55 }];
-  if (/\b(face|portrait|skin|selfie|restore)\b/.test(p)) return [{ type: 'enhance_face' }];
-  if (/\b(sharpen|sharp|crisp|clearer|make it look better|enhance|improve|better)\b/.test(p)) {
-    return [{ type: 'sharpen', amount: 65 }];
-  }
-  return [{ type: 'style_edit', prompt, strength: /\b(subtle|slight|small)\b/.test(p) ? 0.35 : 0.55 }];
 }
 
 // Document summary sent to the planner (no pixels).
@@ -1112,7 +968,7 @@ function _wireAiCommandBox() {
     setBusy(true);
     try {
       // 1. Exact built-in commands run immediately, with or without a model.
-      const exact = _matchQuickEditCommand(p, prompt, { strict: true });
+      const exact = matchQuickEditCommand(p, prompt, { strict: true });
       if (exact) {
         await _runQuickEditActions(exact, runBtn);
         return;
@@ -1137,7 +993,7 @@ function _wireAiCommandBox() {
         return;
       }
       // 3. No model: upstream's keyword rules, ending in a style edit.
-      await _runQuickEditActions(_matchQuickEditCommand(p, prompt, { strict: false }), runBtn);
+      await _runQuickEditActions(matchQuickEditCommand(p, prompt, { strict: false }), runBtn);
     } catch (err) {
       console.error('[ge-ai-command] failed', err);
       _setAiCommandStatus(err?.message || 'AI edit failed', 'error');

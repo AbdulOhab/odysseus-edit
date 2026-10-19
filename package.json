@@ -1,0 +1,12 @@
+{
+  "name": "odysseus-edit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A layered image editor for the browser, extracted from Odysseus, with optional AI tools.",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "test": "node --test web/tests/",
+    "serve:static": "python3 -m http.server 8000 --directory web"
+  }
+}
