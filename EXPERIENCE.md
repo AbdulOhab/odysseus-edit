@@ -72,6 +72,9 @@ changing code; add to it when something costs you time. Group by area.
   `sessionStorage` and delete the `odysseus-edit` IndexedDB for a clean run.
 - `style.cssText` serialises with spaces (`z-index: 10001`), so attribute
   selectors must include them.
+- `python3 -m http.server` sends no cache headers, so Chromium heuristically
+  caches CSS/JS and a plain reload can show stale styles. Reload with the cache
+  bypassed (or use the project server, which sends `Cache-Control: no-cache`).
 
 ## AI providers
 

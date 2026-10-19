@@ -20,6 +20,10 @@ body.oe-body {
   font-family: var(--oe-font);
 }
 body.oe-body.oe-editing { overflow: hidden; }
+/* Let the start page scroll the document (mobile URL bars collapse) rather
+   than the fixed-height body upstream uses for the workspace. */
+html:has(> body.oe-body:not(.oe-editing)) { height: auto; overflow-y: auto; }
+body.oe-body:not(.oe-editing) { height: auto; min-height: 100dvh; overflow: visible; }
 
 .gallery-editor-container {
   position: fixed;
@@ -204,7 +208,7 @@ body.oe-body.oe-editing { overflow: hidden; }
 
 .oe-drafts {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 14px;
 }
 .oe-draft {
