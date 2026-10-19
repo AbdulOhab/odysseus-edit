@@ -155,6 +155,11 @@ def vendor_tree() -> set[str]:
 def ensure_vendor_branch() -> None:
     if git("branch", "--list", VENDOR_BRANCH):
         return
+    # A fresh clone only has the remote-tracking copy.
+    if run(["git", "rev-parse", "--verify", "--quiet", f"origin/{VENDOR_BRANCH}"], check=False).returncode == 0:
+        git("branch", VENDOR_BRANCH, f"origin/{VENDOR_BRANCH}")
+        print(f"Created branch '{VENDOR_BRANCH}' from origin/{VENDOR_BRANCH}.")
+        return
     root_commit = git("rev-list", "--max-parents=0", "HEAD").splitlines()[-1]
     git("branch", VENDOR_BRANCH, root_commit)
     print(f"Created branch '{VENDOR_BRANCH}' at the pristine import commit {root_commit[:9]}.")
@@ -280,7 +285,7 @@ def check_shims() -> list[str]:
             if f"{name}'" not in text and f'{name}"' not in text:
                 continue
             for alias in re.findall(rf"import\s+(\w+)\s+from\s+['\"][./]*{re.escape(name)}['\"]", text):
-                for fn in re.findall(rf"\b{alias}\??\.(\w+)", text):
+                for fn in re.findall(rf"\b{alias}\??\.(\w+)\s*\(", text):
                     used.setdefault(fn, set()).add(str(path.relative_to(ROOT)))
             for group in re.findall(rf"import\s*\{{([^}}]*)\}}\s*from\s+['\"][./]*{re.escape(name)}['\"]", text):
                 for fn in group.split(","):
