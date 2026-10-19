@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node
+node_modules/
+
+# Secrets and local config
+.env
+config/providers.toml
+
+# Runtime data
+server/data/
+*.log
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Test artifacts
+.playwright-mcp/
+test-results/
