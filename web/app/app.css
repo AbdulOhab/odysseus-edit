@@ -458,3 +458,12 @@ html:root .ge-ai-command-model:focus-visible {
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* Upstream parks the collapsed Quick Edit pill at bottom: -16px so it peeks
+   out from under the canvas edge. The canvas area scrolls (overflow: auto,
+   for zoomed-in images), so those 16px made it scrollable: a scrollbar
+   flashed in whenever the pointer left the canvas and the pill dropped.
+   Keep the pill inside the edge; hover still lifts it to 10px. */
+.ge-ai-command.ge-ai-command-collapsed { bottom: 4px; }
+.ge-ai-command.ge-ai-command-collapsed:hover,
+.ge-ai-command.ge-ai-command-collapsed:focus-within { bottom: 10px; }

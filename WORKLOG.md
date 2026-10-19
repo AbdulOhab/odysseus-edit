@@ -2,6 +2,19 @@
 
 Newest entry first. Each entry: what changed, how it was verified, what is left.
 
+## 2026-10-19 (night, 2): scrollbar on the right of the canvas
+
+**Found** The collapsed Quick Edit pill hung 16px below the canvas area
+(`bottom: -16px`), making the area scrollable by 16px whenever the pointer was
+not over the canvas; overlay scrollbars appeared near the right edge.
+
+**Done** Collapsed pill stays inside the edge (`bottom: 4px`), hover still
+lifts it.
+
+**Verified** At fit zoom `scrollHeight === clientHeight` with the pointer over
+the canvas and over the right panel (no scrollbar gutter). Zoomed in, the
+mouse wheel still scrolls the canvas.
+
 ## 2026-10-19 (night): Quick Edit look and replies
 
 **Done** (from the user's screenshots: "no need for toasts, the design broke")

@@ -58,6 +58,13 @@ changing code; add to it when something costs you time. Group by area.
 
 ## Upstream quirks found
 
+- **Phantom scrollbar on the canvas.** The collapsed Quick Edit pill sat at
+  `bottom: -16px` inside `.ge-canvas-area`, which is `overflow: auto` (needed:
+  wheel-scrolling a zoomed-in canvas is native scrolling). Those 16px made the
+  area scrollable whenever the pill dropped (pointer left the canvas), so
+  overlay scrollbars flashed in on the right. Fixed in `app/app.css`; check
+  `scrollHeight === clientHeight` at fit zoom after touching overlays.
+
 - The "Gallery" import button (now "Recent") lives in `#ge-import-section`,
   which only shows when `state.tool === 'import'`, and no toolbar button sets
   that tool. It was unreachable upstream; the topbar Import button now opens a
