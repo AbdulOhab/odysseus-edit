@@ -24,7 +24,8 @@
  *   openCookbookForImg2img: () => void,
  * }} deps
  *
- * Modified for Odysseus-Edit (2026-10-19): model picker setup label instead of Odysseus Cookbook. See NOTICE.md.
+ * Modified for Odysseus-Edit (2026-10-19): model picker setup label instead of Odysseus Cookbook;
+ * records each endpoint's provider kind in state.aiEndpointKinds. See NOTICE.md.
  */
 import { state } from './state.js';
 import { sortModelIds } from '../modelSort.js';
@@ -115,6 +116,9 @@ export function wireAIModelSelectors({ container, apiBase, openCookbookForImg2im
       let firstGen = null;
       let selectedGen = null;
       let selectedInpaint = null;
+      // Odysseus-Edit: remember each endpoint's provider kind so tools can
+      // tell OpenAI-compatible image APIs from diffusion servers.
+      state.aiEndpointKinds = new Map(endpoints.map(ep => [ep.base_url, ep.kind || '']));
       for (const ep of endpoints) {
         if (!ep.is_enabled) continue;
         const hasListedModels = Array.isArray(ep.models) && ep.models.length;

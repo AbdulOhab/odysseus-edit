@@ -1,0 +1,53 @@
+[project]
+name = "odysseus-edit-server"
+version = "0.1.0"
+description = "Local backend for Odysseus-Edit: static frontend, local image tools, and image-model proxying."
+readme = { text = "Backend for Odysseus-Edit. See the repository root for documentation.", content-type = "text/plain" }
+license = "AGPL-3.0-or-later"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "httpx>=0.27",
+    "pillow>=10.0",
+    "numpy>=1.26",
+    "python-dotenv>=1.0",
+    "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+# Background removal (rembg + onnxruntime). Model weights download on first use.
+rembg = ["rembg[cpu]>=2.0.50"]
+# SAM click/box masks and OWL-ViT text grounding for /api/image/mask.
+sam = ["torch>=2.2", "torchvision>=0.17", "transformers>=4.40", "accelerate>=0.30"]
+# Everything uv can lock. Real-ESRGAN (denoise, AI upscale) and GFPGAN (face
+# restore) depend on basicsr, which ships only an sdist whose setup.py imports
+# torch, so it cannot be locked or built in isolation. Install those by hand
+# after this extra: `uv pip install --no-build-isolation basicsr realesrgan gfpgan`.
+ai-local = ["odysseus-edit-server[rembg,sam]"]
+
+[project.scripts]
+odysseus-edit = "app.main:run"
+
+[dependency-groups]
+dev = ["pytest>=8.0", "httpx2"]
+
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "SIM", "UP", "I"]
+# FastAPI declares dependencies as `param = Depends(...)` defaults.
+ignore = ["B008"]

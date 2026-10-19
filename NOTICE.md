@@ -27,11 +27,18 @@ Mirrored from `odysseus/static/` at the same relative paths:
   `platform.js`, `modelSort.js`, `toolWindowZOrder.js`
 - `web/css/00-tokens.css`, `web/css/13-image-editor.css`
 
-Backend code under `server/` is adapted from
-`odysseus/routes/gallery/gallery_routes.py`.
+Backend files adapted from `odysseus/routes/gallery/gallery_routes.py` and
+`odysseus/src/url_safety.py` carry an "Adapted from Odysseus" header:
+`server/app/imaging.py`, `server/app/url_safety.py`,
+`server/app/routers/image_local.py`, `server/app/routers/image_ai.py`,
+`server/app/services/local_tools.py`, `server/app/services/image_vendors.py`.
 
-Files under `web/app/` and the shims `web/js/ui.js` and
-`web/js/modalManager.js` are new to this project.
+New to this project: `web/app/`, the shims `web/js/ui.js` and
+`web/js/modalManager.js`, `tools/`, and the rest of `server/` (config,
+middleware, the multi-vendor LLM client `llm.py`, the Quick Edit planner).
+
+Fira Code (`web/fonts/`) is by Nikita Prokopov, SIL Open Font License 1.1
+([licenses/FiraCode-OFL-1.1.txt](licenses/FiraCode-OFL-1.1.txt)).
 
 ## License
 

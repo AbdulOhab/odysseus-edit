@@ -6543,6 +6543,7 @@ function _buildEditor(container) {
     spinnerModule,
     uiModule,
     openAdjustmentLayer: (type, anchor) => _addAdjustmentLayer(type, anchor),
+    getSelectedAIEndpoint: (type) => _getSelectedAIEndpoint(type),
   });
   _runAiUpscale = runAiUpscale;
   // (Merge dropdown removed — Merge Down / Merge All / Flatten Copy

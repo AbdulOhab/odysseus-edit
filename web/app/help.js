@@ -15,9 +15,12 @@ uv run odysseus-edit</code></pre>
   rembg: {
     title: 'Install local AI tools',
     body: `
-      <p>Background removal and smart masks use <code>rembg</code>, an optional package of the server.</p>
+      <p>Background removal uses <code>rembg</code>, an optional package of the server.</p>
       <pre><code>cd server
-uv sync --extra ai-local</code></pre>
+uv sync --extra rembg</code></pre>
+      <p>Smart masks (SAM) need <code>--extra sam</code> (PyTorch, several GB). Denoise,
+      AI upscale and face restore need Real-ESRGAN and GFPGAN, installed by hand:</p>
+      <pre><code>uv pip install --no-build-isolation basicsr realesrgan gfpgan</code></pre>
       <p>Restart the server afterwards. The first run downloads the model weights.</p>`,
   },
   'image-model': {

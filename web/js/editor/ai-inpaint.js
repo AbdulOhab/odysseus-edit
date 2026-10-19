@@ -39,6 +39,9 @@
  *   spinnerModule:          object,
  *   uiModule:               object | null,
  * }} deps
+ *
+ * Modified for Odysseus-Edit (2026-10-19): "Remove" treats every
+ * openai-images provider (not only api.openai.com) as OpenAI-style. See NOTICE.md.
  */
 import { state } from './state.js';
 import { beginAIOperation, decodeAIImage } from './ai-operation.js';
@@ -290,7 +293,7 @@ export function wireInpaintButtons({
     try { sel = getSelectedAIEndpoint('inpaint'); }
     catch (error) { uiModule?.showToast(error.message); return; }
     const ep = (sel.endpoint || '').toLowerCase();
-    const isOpenAI = ep.includes('api.openai.com');
+    const isOpenAI = state.aiEndpointKinds?.get(sel.endpoint) === 'openai-images' || ep.includes('api.openai.com');
     let prompt, strength;
     if (isOpenAI) {
       const userP = document.getElementById('ge-inpaint-prompt')?.value?.trim();

@@ -31,7 +31,9 @@
  * @returns {{ addEmptyLayer: () => void }}
  *
  * Modified for Odysseus-Edit (2026-10-19): AI upscale is a callable
- * runAiUpscale(scale, btn) so Quick Edit can run it. See NOTICE.md.
+ * runAiUpscale(scale, btn) so Quick Edit can run it; style transfer sends
+ * the Style model picker's choice; failures show the server's detail.
+ * See NOTICE.md.
  */
 import { state } from './state.js';
 import { beginAIOperation, decodeAIImage } from './ai-operation.js';
@@ -39,8 +41,16 @@ import { beginAIOperation, decodeAIImage } from './ai-operation.js';
 export function wireAIToolsMisc({
   apiBase, buildLayerBodyMask, buildSeamMask, applyImageTool,
   flatten, saveState, fitZoom, composite, createLayer, renderLayerPanel,
-  spinnerModule, uiModule, openAdjustmentLayer,
+  spinnerModule, uiModule, openAdjustmentLayer, getSelectedAIEndpoint,
 }) {
+  // Prefer the server's explanation ("No image model configured…") over a
+  // bare status code.
+  async function responseError(res) {
+    let detail = '';
+    try { const body = await res.json(); detail = body.detail || body.error || ''; } catch (_) {}
+    return new Error(detail ? String(detail) : 'Server returned ' + res.status);
+  }
+
   // ── Harmonize sliders — Color match + Seam fix ──
   const harmColorPrev = document.getElementById('ge-harmonize-color-preview');
   const harmSeamPrev = document.getElementById('ge-harmonize-seam-preview');
@@ -130,7 +140,7 @@ export function wireAIToolsMisc({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: imageB64, scale: scale === 4 ? 4 : 2 }),
       });
-      if (!res.ok) throw new Error('Server returned ' + res.status);
+      if (!res.ok) throw await responseError(res);
       const data = await res.json();
       if (data.image) {
         const img = await decodeAIImage(data.image, operation.signal);
@@ -188,8 +198,13 @@ export function wireAIToolsMisc({
       fd.append('image', blob, 'style.png');
       fd.append('prompt', prompt);
       fd.append('strength', String(strength));
+      // Send the Style tool's model picker choice (upstream left it unused).
+      let sel = { endpoint: '', model: '' };
+      try { sel = getSelectedAIEndpoint?.('style') || sel; } catch (_) {}
+      if (sel.endpoint) fd.append('_endpoint', sel.endpoint);
+      if (sel.model) fd.append('_model', sel.model);
       const res = await fetch(`${apiBase}/api/gallery/style-transfer`, { method: 'POST', credentials: 'same-origin', body: fd, signal: operation.signal });
-      if (!res.ok) throw new Error('Server returned ' + res.status);
+      if (!res.ok) throw await responseError(res);
       const data = await res.json();
       if (data.image) {
         const img = await decodeAIImage(data.image, operation.signal);

@@ -2,6 +2,42 @@
 
 Newest entry first. Each entry: what changed, how it was verified, what is left.
 
+## 2026-10-19 (later): AI server and multi-vendor Quick Edit
+
+**Done**
+- `server/` (FastAPI, uv, Python 3.12): serves `web/` with `no-cache`, plus
+  the image AI endpoints ported from Odysseus (inpaint, harmonize, style
+  transfer, sharpen, denoise, upscale, SAM masks, background removal, face
+  enhance). Image vendors: OpenAI-compatible Images API and self-hosted
+  diffusion servers. Browser-chosen endpoints must match a configured provider
+  (no SSRF); keys never leave the server. Host + Origin checks, 50 MB body cap.
+  Heavy ML packages are optional extras.
+- Multi-vendor language models (`server/app/llm.py`): Anthropic Messages
+  (Anthropic, Z.ai GLM via `https://api.z.ai/api/anthropic`, bearer or
+  x-api-key auth) and OpenAI-compatible Chat Completions (OpenAI, OpenRouter,
+  Ollama...).
+- Quick Edit planner (`server/app/planner.py`, `/api/ai/providers`,
+  `/api/ai/command`): prompt lists only the AI tools this install has; the
+  reply is validated and clamped; unknown actions are dropped.
+- Frontend: Quick Edit model picker, style transfer sends its model choice,
+  AI errors show the server's detail, "Remove" recognises any OpenAI-style
+  image provider, setup help names the right extras.
+
+**Verified**
+- `cd server && uv run pytest`: 152 passed, 3 skipped (real-model tests
+  need `ODYSSEUS_EDIT_TEST_MODELS=1`); ruff clean. `npm test`: 9 passed.
+- End to end with a mock Anthropic-format server standing in for GLM:
+  start page shows "AI ready · Quick Edit: glm-5.3"; "give it a warm sunset
+  mood" → server → mock (Bearer key, anthropic-version, model glm-5.3,
+  document context) → three adjustment layers (Sunset warmth, Vibrance,
+  Shadows/Highlights), an invented "teleport" action dropped; Sharpen ran on
+  the server and added a layer. No page errors.
+
+**Left**
+- Not tested against the real Z.ai API (no key in this environment).
+- Real rembg / Real-ESRGAN / SAM runs (weights download) not exercised.
+- Image-model features (inpaint, style edit) tested only with mocked vendors.
+
 ## 2026-10-19: Project created, editor extracted
 
 **Done**
@@ -40,4 +76,4 @@ Newest entry first. Each entry: what changed, how it was verified, what is left.
 - No page errors; only expected 404s for `/api/*` without the server.
 
 **Left**
-- AI server (`server/`) is being ported; Quick Edit planner endpoint next.
+- (done in the next entry) AI server and Quick Edit planner.

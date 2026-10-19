@@ -1,4 +1,4 @@
-# Experience log
+# Experience
 
 Lessons, traps and decisions from building Odysseus-Edit. Read this before
 changing code; add to it when something costs you time. Group by area.
@@ -86,3 +86,43 @@ changing code; add to it when something costs you time. Group by area.
   actions (adjustment layers, rotate, AI tools) that the editor runs, so every
   step stays undoable. Inpainting and style edits need an image model
   (OpenAI Images or a diffusion server).
+
+## Server (Python, uv)
+
+- **Never put `realesrgan`/`gfpgan` in a pyproject extra.** `basicsr` ships only
+  an sdist whose `setup.py` imports torch; `uv lock` resolves every extra, so
+  the lock hangs or fails even for the base install. Install them by hand with
+  `--no-build-isolation`.
+- **rembg calls `sys.exit(1)` at import when onnxruntime is missing.** Probe
+  `find_spec("onnxruntime")` first; a SystemExit can take the server down.
+- **rembg's default model changed to bria-rmbg (CC BY-NC 4.0).** We pin
+  `u2net` (Apache-2.0). Upstream's transformers fallback (briaai/RMBG-1.4) has
+  Bria's own licence and runs remote code (`trust_remote_code=True`).
+- Upstream decoded masks with `.convert("L")`, ignoring alpha; masks are now
+  weighted by alpha. Upstream denoise `strength` never had an effect
+  (RealESRGANer ignores `dni_weight` with one model path).
+- **`request.json()` ignores Content-Type**, so a cross-site `text/plain` form
+  POST could spend the user's API keys. `app/middleware.py` checks Host
+  (DNS rebinding) and Origin (cross-site writes).
+- `uv sync --extra sam` pulls CUDA PyTorch on Linux (several GB).
+- FastAPI dependencies are `param = Depends(...)` defaults; ruff's B008 is
+  disabled for that in `server/pyproject.toml`.
+- **Stopping background servers:** `pkill -f <pattern>` can match and kill the
+  shell running it. Find the PID from the port instead:
+  `ss -ltnpH "sport = :7021"`.
+
+## Quick Edit planner
+
+- One action vocabulary in two places: `web/app/quick-edit.js` (browser,
+  maps to adjustment layers) and `server/app/planner.py` (prompt + validation).
+  Change both together, and their tests.
+- The planner asks for plain JSON instead of vendor tool-calling: every vendor
+  (Anthropic, GLM, OpenAI, Ollama) can do it, and `llm.extract_json_object`
+  tolerates code fences, `<think>` blocks and surrounding prose.
+- Thinking models return extra content blocks (`type: "thinking"`); only
+  `text` blocks are read.
+- Newer OpenAI reasoning models reject `max_tokens`/`temperature`; the client
+  retries once with `max_completion_tokens` and without temperature.
+- The canvas preview is sent only to providers with the `vision` capability.
+- For end-to-end tests without a real key, a 40-line mock of `/v1/messages`
+  (Anthropic format) is enough; point a provider's `base_url` at it.
