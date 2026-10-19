@@ -467,3 +467,327 @@ html:root .ge-ai-command-model:focus-visible {
 .ge-ai-command.ge-ai-command-collapsed { bottom: 4px; }
 .ge-ai-command.ge-ai-command-collapsed:hover,
 .ge-ai-command.ge-ai-command-collapsed:focus-within { bottom: 10px; }
+
+/* ── Photoshop-style chrome: menu bar + options bar (app/editor-chrome.js) ── */
+
+.ge-topbar.oe-legacy-topbar { display: none !important; }
+
+.oe-topbar {
+  --oe-chrome-font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Noto Sans Bengali', sans-serif;
+  --oe-chrome-bg: var(--panel);
+  --oe-chrome-line: color-mix(in srgb, var(--border) 70%, transparent);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 6;
+  font-family: var(--oe-chrome-font);
+  background: var(--oe-chrome-bg);
+  border-bottom: 1px solid var(--oe-chrome-line);
+}
+
+.oe-menubar {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  height: 30px;
+  padding: 0 8px 0 4px;
+  border-bottom: 1px solid var(--oe-chrome-line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.oe-menubar::-webkit-scrollbar { display: none; }
+
+.oe-app-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 24px;
+  margin-right: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--red);
+  cursor: pointer;
+  flex: none;
+}
+.oe-app-btn:hover { background: color-mix(in srgb, var(--fg) 10%, transparent); }
+
+.oe-menu-title {
+  height: 24px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--fg);
+  font: 12.5px/24px var(--oe-chrome-font);
+  cursor: default;
+  white-space: nowrap;
+  flex: none;
+}
+.oe-menu-title:hover,
+.oe-menu-title.active { background: color-mix(in srgb, var(--fg) 12%, transparent); }
+.oe-menu-title:focus-visible,
+.oe-app-btn:focus-visible { outline: 2px solid var(--red); outline-offset: -2px; }
+
+.oe-menubar-spacer { flex: 1; min-width: 12px; }
+.oe-doc-name {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--fg);
+  opacity: 0.65;
+}
+.oe-save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 12px;
+  font-size: 11.5px;
+  color: var(--fg);
+  opacity: 0.75;
+  white-space: nowrap;
+  flex: none;
+}
+.oe-save-status::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+.oe-save-status[data-state="saved"]::before { background: var(--color-success); }
+.oe-save-status[data-state="error"] { color: var(--color-error); opacity: 1; }
+.oe-save-status[data-state="error"]::before { background: var(--color-error); }
+
+/* Dropdown menus live on <body> so the scrolling menu bar cannot clip them. */
+.oe-menu {
+  position: fixed;
+  z-index: 10050;
+  min-width: 220px;
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  padding: 4px;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--fg);
+  font: 12.5px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+.oe-menu-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 26px;
+  padding: 3px 10px 3px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+.oe-menu-item:hover:not(:disabled),
+.oe-menu-item:focus-visible,
+.oe-menu-item.sub-open {
+  background: var(--red);
+  color: #fff;
+  outline: none;
+}
+.oe-menu-item:disabled { opacity: 0.4; }
+.oe-menu-check { font-size: 11px; text-align: center; }
+.oe-menu-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oe-menu-shortcut,
+.oe-menu-arrow {
+  padding-left: 18px;
+  font-size: 11.5px;
+  opacity: 0.6;
+  white-space: nowrap;
+}
+.oe-menu-item:hover .oe-menu-shortcut,
+.oe-menu-item:focus-visible .oe-menu-shortcut { opacity: 0.85; }
+.oe-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--oe-faint);
+}
+.oe-menu-header {
+  padding: 6px 10px 2px 28px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+.oe-menu-row { display: flex; align-items: center; gap: 2px; }
+.oe-menu-row .oe-menu-item { flex: 1; }
+.oe-menu-trailing {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+}
+.oe-menu-trailing:hover { opacity: 1; color: var(--color-error); background: color-mix(in srgb, var(--fg) 10%, transparent); }
+.oe-menu-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 28px;
+}
+.oe-menu-form-label { font-size: 12px; opacity: 0.8; }
+html:root .oe-menu-input {
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+html:root .oe-menu-input-num { flex: 0 0 64px; }
+.oe-menu-mini-btn {
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+.oe-menu-mini-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* Options bar */
+.oe-optionsbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 8px 0 10px;
+  background: color-mix(in srgb, var(--panel) 88%, var(--bg));
+  overflow-x: auto;
+  scrollbar-width: none;
+  font-size: 12px;
+  color: var(--fg);
+}
+.oe-optionsbar::-webkit-scrollbar { display: none; }
+.oe-options-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding-right: 12px;
+  border-right: 1px solid var(--oe-chrome-line);
+  font-weight: 600;
+  white-space: nowrap;
+  flex: none;
+}
+.oe-options-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--red) 16%, transparent);
+  color: var(--red);
+  font-size: 14px;
+}
+.oe-options-icon svg { width: 15px; height: 15px; }
+.oe-options-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  /* Keep its natural width: on narrow screens the whole bar scrolls
+     instead of the controls sliding under the undo/redo group. */
+  flex: 0 0 auto;
+}
+.oe-options-hint {
+  font-size: 11.5px;
+  opacity: 0.6;
+  white-space: nowrap;
+}
+.oe-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  flex: none;
+}
+.oe-opt-label { opacity: 0.7; }
+html:root .oe-opt-range { width: 96px; accent-color: var(--red); background: transparent; }
+.oe-opt-value { min-width: 34px; font-variant-numeric: tabular-nums; opacity: 0.85; }
+html:root .oe-opt-number {
+  width: 62px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid var(--oe-chrome-line);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+html:root .oe-opt-number[readonly] { opacity: 0.6; }
+html:root .oe-opt-select {
+  max-width: 150px;
+  height: 24px;
+  padding: 0 4px;
+  border: 1px solid var(--oe-chrome-line);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+html:root .oe-opt-color { width: 24px; height: 24px; padding: 0; border-radius: 5px; }
+.oe-opt-btn {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--oe-chrome-line);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+.oe-opt-btn:hover { border-color: var(--border); }
+.oe-opt-btn.active { background: var(--red); border-color: var(--red); color: #fff; }
+.oe-options-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  padding-left: 10px;
+  border-left: 1px solid var(--oe-chrome-line);
+  flex: none;
+}
+.oe-opt-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--fg);
+  opacity: 0.8;
+  cursor: pointer;
+}
+.oe-opt-icon:hover:not(:disabled) { opacity: 1; background: color-mix(in srgb, var(--fg) 10%, transparent); }
+.oe-opt-icon:disabled { opacity: 0.3; cursor: default; }
+.oe-opt-icon.active { color: var(--red); opacity: 1; }

@@ -79,20 +79,24 @@ export function styledConfirm(message, {
 } = {}) {
   return new Promise(resolve => {
     const previouslyFocused = document.activeElement;
+    // Upstream code drives this dialog by id (e.g. Enter/Escape on the
+    // rasterize prompt clicks #styled-confirm-ok / -cancel), so keep its ids.
+    document.getElementById('styled-confirm-overlay')?.remove();
     const overlay = document.createElement('div');
     overlay.className = 'oe-dialog-overlay';
+    overlay.id = 'styled-confirm-overlay';
     overlay.innerHTML = `
-      <div class="oe-dialog" role="dialog" aria-modal="true" aria-labelledby="oe-confirm-title" aria-describedby="oe-confirm-msg">
-        <h2 class="oe-dialog-title" id="oe-confirm-title"></h2>
-        <p class="oe-dialog-msg" id="oe-confirm-msg"></p>
+      <div class="oe-dialog" role="dialog" aria-modal="true" aria-labelledby="styled-confirm-title" aria-describedby="styled-confirm-msg">
+        <h2 class="oe-dialog-title" id="styled-confirm-title"></h2>
+        <p class="oe-dialog-msg" id="styled-confirm-msg"></p>
         <div class="oe-dialog-actions">
-          <button type="button" class="oe-btn" data-act="cancel"></button>
-          <button type="button" class="oe-btn" data-act="alternate" hidden></button>
-          <button type="button" class="oe-btn oe-btn-primary" data-act="ok"></button>
+          <button type="button" class="oe-btn" id="styled-confirm-cancel" data-act="cancel"></button>
+          <button type="button" class="oe-btn" id="styled-confirm-alt" data-act="alternate" hidden></button>
+          <button type="button" class="oe-btn oe-btn-primary" id="styled-confirm-ok" data-act="ok"></button>
         </div>
       </div>`;
-    overlay.querySelector('#oe-confirm-title').textContent = title;
-    overlay.querySelector('#oe-confirm-msg').textContent = String(message ?? '');
+    overlay.querySelector('#styled-confirm-title').textContent = title;
+    overlay.querySelector('#styled-confirm-msg').textContent = String(message ?? '');
     const okBtn = overlay.querySelector('[data-act="ok"]');
     const cancelBtn = overlay.querySelector('[data-act="cancel"]');
     const altBtn = overlay.querySelector('[data-act="alternate"]');

@@ -247,6 +247,31 @@ async function renderDrafts() {
   }
 }
 
+// ── Commands from the editor's menu bar and shortcuts ────────────────────
+
+async function runCommand(command) {
+  if (command === 'open') return pickImage();
+  if (command === 'new') return openEditor(null, null, null, 'New canvas');
+  if (command === 'close') return goHome();
+  return undefined;
+}
+
+window.addEventListener('oe:command', (e) => { runCommand(e.detail); });
+
+// Ctrl+O opens an image and Ctrl+Alt+N starts a new canvas while editing
+// (the browser's own Ctrl+O / Ctrl+N would leave the app).
+document.addEventListener('keydown', (e) => {
+  if (landing.hidden === false || !(e.ctrlKey || e.metaKey) || e.shiftKey) return;
+  const key = e.key.toLowerCase();
+  if (key === 'o' && !e.altKey) {
+    e.preventDefault();
+    runCommand('open');
+  } else if (key === 'n' && e.altKey) {
+    e.preventDefault();
+    runCommand('new');
+  }
+});
+
 // ── Home button inside the editor ───────────────────────────────────────
 
 document.addEventListener('click', e => {

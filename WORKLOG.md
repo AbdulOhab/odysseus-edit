@@ -2,6 +2,34 @@
 
 Newest entry first. Each entry: what changed, how it was verified, what is left.
 
+## 2026-10-19 (late night): Photoshop-style header
+
+**Done** (user chose "menu bar + options bar"; no Move tool changes)
+- Menu bar: File, Edit, Image (with Adjustments), Layer, Select, Filter, View,
+  Help; hover-switching, arrow-key navigation, Escape, submenus. Document
+  name and draft status on the right; app icon goes home.
+- Options bar: active tool + its main settings mirrored two-way from the right
+  panel (brush/eraser/clone/heal/smudge/dodge/burn size, opacity, flow,
+  softness, mode; gradient; text font/size/colour/bold/italic; shape;
+  marquee; lasso; wand; eyedropper; move/transform X/Y/W/H); undo, redo,
+  history, before/after, shortcuts on the right.
+- File > New / Open (also Ctrl+O, Ctrl+Alt+N) go through the start page.
+- Fixed upstream Escape handling for dialogs (export, confirm, shortcuts)
+  and positioned History/shortcuts next to their (now visible) buttons.
+
+**Verified** (Playwright, dark + light, 1440/1366/390 px)
+- Every menu opens with the expected items; Escape closes; hover switches;
+  New Layer, Duplicate, Undo x2, Levels adjustment, Grid toggle, Select
+  All/Deselect state, Export dialog + Escape, About + Escape, rasterize
+  prompt + Escape, History, Show Before, shortcuts popover.
+- Options mirror: changing the bar's size updates the panel slider and `]`
+  in the canvas updates the bar. No overlap at 390 px (bar scrolls).
+- `npm test` 9 passed, server 155 passed.
+
+**Left**
+- Brush settings appear in both the options bar and the right panel; the
+  panel copy could be trimmed if the user prefers.
+
 ## 2026-10-19 (night, 2): scrollbar on the right of the canvas
 
 **Found** The collapsed Quick Edit pill hung 16px below the canvas area

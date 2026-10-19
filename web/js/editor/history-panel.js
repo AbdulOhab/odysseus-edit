@@ -16,6 +16,9 @@
  *   refreshHistoryPanelIfOpen: () => void,
  *   jumpToHistory:             (offset: number) => void,
  * }}
+ *
+ * Modified for Odysseus-Edit (2026-10-19): the panel is clamped to the
+ * viewport when its button sits at the right edge. See NOTICE.md.
  */
 import { state } from './state.js';
 import modalManager from '../modalManager.js';
@@ -85,7 +88,8 @@ export function createHistoryPanel({ undo, redo }) {
     if (btn) {
       const r = btn.getBoundingClientRect();
       panel.style.top  = (r.bottom + 6) + 'px';
-      panel.style.left = Math.max(8, r.left) + 'px';
+      // Keep the panel on screen when the button sits at the right edge.
+      panel.style.left = Math.max(8, Math.min(r.left, window.innerWidth - panel.offsetWidth - 8)) + 'px';
     }
     panel.querySelector('.ge-adj-min').addEventListener('click', minimiseHistoryPanel);
     // Click anywhere outside the panel (or trigger button) closes it.

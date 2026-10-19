@@ -3,7 +3,10 @@
  *
  * Modified for Odysseus-Edit (2026-10-19): drafts, saving, recent images and
  * AI setup help go through ../app/host.js instead of the Odysseus server
- * (gallery, server-side drafts, Cookbook). See NOTICE.md.
+ * (gallery, server-side drafts, Cookbook); Quick Edit runs a shared action
+ * vocabulary with an optional language-model planner; a Photoshop-style menu
+ * bar and options bar (../app/editor-chrome.js) sit over the top bar.
+ * See NOTICE.md.
  */
 
 import uiModule from './ui.js';
@@ -13,6 +16,7 @@ import { attachColorPicker } from './colorPicker.js';
 import modalManager from './modalManager.js';
 import { host } from '../app/host.js';
 import * as _aiPlanner from '../app/ai-planner.js';
+import { mountEditorChrome, unmountEditorChrome } from '../app/editor-chrome.js';
 import { quickEditAdjustment, matchQuickEditCommand, quickEditNumber as _qeNum, QUICK_EDIT_LABELS } from '../app/quick-edit.js';
 import { canvasCoords as _canvasCoords } from './editor/canvas-coords.js';
 import { drawCheckerboard as _drawCheckerboard } from './editor/checkerboard.js';
@@ -280,6 +284,17 @@ if (!window.__galleryEditEscHardGuardInstalled) {
       return;
     }
     if (e.key !== 'Escape') return;
+    // Odysseus-Edit: an open dialog (export, confirm, help) handles its own
+    // Escape; the catch-all at the end of this guard used to swallow it.
+    if (document.querySelector('[aria-modal="true"]')) return;
+    // The shortcuts popover's own Escape handler sits behind this guard too.
+    const shortcutsPopover = document.getElementById('ge-shortcuts-popover');
+    if (shortcutsPopover && shortcutsPopover.style.display !== 'none') {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      document.getElementById('ge-shortcuts-close')?.click();
+      return;
+    }
     // Quick Edit owns Escape while expanded. Dispatch a local close event
     // before the gallery-level guard can consume it for the whole editor.
     const quickEdit = e.target?.closest?.('#ge-ai-command');
@@ -6668,6 +6683,8 @@ function _buildEditor(container) {
       return;
     }
     if (e.key !== 'Escape') return;
+    // Odysseus-Edit: let an open dialog (export, confirm, help) close itself.
+    if (document.querySelector('[aria-modal="true"]')) return;
     // Escape is disabled inside Gallery Edit. It must not close the
     // editor, close Gallery, or cancel active editor state.
     e.preventDefault();
@@ -6721,6 +6738,19 @@ function _buildEditor(container) {
     composite,
     handleImportedImage: (img, sourceName) => _handleImportedImage(img, sourceName),
     uiModule,
+  });
+
+  // Odysseus-Edit: Photoshop-style menu bar + tool options bar. Upstream's
+  // top bar stays in the DOM (hidden) and keeps all of its wiring.
+  mountEditorChrome({
+    container,
+    legacyTopbar: topBar,
+    api: {
+      getTool: () => state.tool,
+      addAdjustmentLayer: (type) => _addAdjustmentLayer(type, null),
+      renderSelectionMenu: () => _renderSavedSelectionsMenu?.(),
+      getDocumentName: () => state.draftName || '',
+    },
   });
 }
 
@@ -7700,6 +7730,7 @@ export function closeEditor(options = {}) {
       });
     }
   } catch {}
+  unmountEditorChrome();
   if (state.container) {
     state.container.style.display = 'none';
     state.container.innerHTML = '';

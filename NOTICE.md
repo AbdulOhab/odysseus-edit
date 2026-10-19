@@ -33,7 +33,8 @@ Backend files adapted from `odysseus/routes/gallery/gallery_routes.py` and
 `server/app/routers/image_local.py`, `server/app/routers/image_ai.py`,
 `server/app/services/local_tools.py`, `server/app/services/image_vendors.py`.
 
-New to this project: `web/app/`, the shims `web/js/ui.js` and
+New to this project: `web/app/` (including the menu bar and options bar in
+`web/app/editor-chrome.js`), the shims `web/js/ui.js` and
 `web/js/modalManager.js`, `tools/`, and the rest of `server/` (config,
 middleware, the multi-vendor LLM client `llm.py`, the Quick Edit planner).
 

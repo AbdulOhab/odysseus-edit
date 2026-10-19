@@ -9,6 +9,9 @@
  * undefined to toggle.
  *
  * @returns {{ toggleShortcuts: (show?: boolean) => void }}
+ *
+ * Modified for Odysseus-Edit (2026-10-19): centred when its toolbar
+ * button is hidden (opened from the Help menu). See NOTICE.md.
  */
 import { shortcutsPopupHTML } from './build/popups.js';
 
@@ -98,6 +101,15 @@ export function createShortcutsPopover() {
     el.style.top  = top + 'px';
   }
 
+  // Odysseus-Edit: opened from the Help menu the button is hidden, so
+  // centre the popover in the viewport instead.
+  function centerPopover(el) {
+    el.style.display = 'block';
+    const pr = el.getBoundingClientRect();
+    el.style.left = Math.max(8, (window.innerWidth - pr.width) / 2) + 'px';
+    el.style.top = Math.max(8, (window.innerHeight - pr.height) / 2) + 'px';
+  }
+
   function toggleShortcuts(show) {
     const el = ensurePopover();
     const open = show === undefined ? el.style.display === 'none' : show;
@@ -121,8 +133,8 @@ export function createShortcutsPopover() {
         });
       } else {
         const anchor = document.getElementById('ge-shortcuts-btn');
-        if (anchor) positionPopover(el, anchor);
-        else el.style.display = 'block';
+        if (anchor && anchor.offsetParent !== null) positionPopover(el, anchor);
+        else centerPopover(el);
       }
       // Defer outside-click so the click that opened us doesn't close us.
       outside = (e) => {

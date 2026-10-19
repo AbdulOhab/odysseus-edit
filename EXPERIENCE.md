@@ -147,3 +147,33 @@ changing code; add to it when something costs you time. Group by area.
   Clone, Crop, ...) and asks the model to tell the user which one to use.
 - For end-to-end tests without a real key, a 40-line mock of `/v1/messages`
   (Anthropic format) is enough; point a provider's `base_url` at it.
+
+## Editor chrome (menu bar + options bar)
+
+- `web/app/editor-chrome.js` hides upstream's top bar (`.oe-legacy-topbar`)
+  instead of deleting it: all its wiring keeps working, and menu items click
+  its buttons, read its dropdowns (Image/Select/Filter/View) at open time, or
+  send the keyboard shortcut the editor already handles (synthetic
+  `KeyboardEvent` on `document.body`). Upstream menu changes flow through.
+- Buttons that position a popup next to themselves (History, shortcuts) must
+  stay visible: they are **moved** into the options bar, not proxied. A
+  proxy leaves the real button hidden at (0,0) and the popup opens there.
+- The panel's "New layer" button opens a layer-type picker, it does not add a
+  layer; Layer > New Layer sends Ctrl+Alt+J (`addEmptyLayer`).
+- **Escape is swallowed twice upstream**: a window-capture guard and a
+  document-capture guard in `galleryEditor.js` both end with "consume every
+  Escape while the editor is mounted" (it protected the Odysseus gallery
+  modal). That also killed Escape in the export dialog, confirm dialogs and
+  the shortcuts popover. Both guards now return early when an
+  `[aria-modal="true"]` dialog is open; the window guard closes the shortcuts
+  popover itself.
+- Menu keyboard handling is a window-capture listener registered when
+  `editor-chrome.js` is imported, i.e. before `galleryEditor.js`'s body runs,
+  so it sees keys before the editor's guard.
+- Upstream drives the confirm dialog by id (`#styled-confirm-ok/-cancel`,
+  `#styled-confirm-overlay`); the `ui.js` shim keeps those ids.
+- Hover-to-switch menus: opening by hover then clicking the same title must
+  not toggle it closed (`openState.viaHover`).
+- Class-name trap: a field `<label class="oe-opt oe-opt-range">` wrapping
+  `<input class="oe-opt-range">` styled the label as a 96px slider. Use a
+  modifier (`oe-opt--range`) for containers.
