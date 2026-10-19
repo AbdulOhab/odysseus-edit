@@ -26,7 +26,8 @@
  * @returns {{ handleImportedImage: (img: HTMLImageElement) => void }}
  *
  * Modified for Odysseus-Edit (2026-10-19): the Gallery picker lists recent
- * images from ../../app/host.js instead of /api/gallery/library. See NOTICE.md.
+ * images from ../../app/host.js instead of /api/gallery/library, and the
+ * topbar Import button opens a File / Clipboard / Recent menu. See NOTICE.md.
  */
 import { state } from './state.js';
 import { host } from '../../app/host.js';
@@ -99,7 +100,63 @@ export function wireImport({ container, saveState, createLayer, composite, rende
     importFileInput.value = '';
   });
 
-  document.getElementById('ge-import-topbar')?.addEventListener('click', () => importFileInput.click());
+  // Topbar Import opens a small menu (File / Clipboard / Recent). Upstream
+  // went straight to the file picker, which left Recent unreachable.
+  {
+    const importBtn = document.getElementById('ge-import-topbar');
+    if (importBtn) {
+      const menu = document.createElement('div');
+      menu.className = 'ge-save-menu dropdown oe-import-menu';
+      menu.id = 'oe-import-menu';
+      menu.hidden = true;
+      menu.setAttribute('role', 'menu');
+      const icons = {
+        file: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>',
+        paste: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>',
+        recent: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+      };
+      const items = [
+        ['file', 'From file…', () => importFileInput.click()],
+        ['paste', 'From clipboard', () => document.getElementById('ge-import-paste')?.click()],
+        ['recent', 'Recent images…', () => document.getElementById('ge-import-gallery')?.click()],
+      ];
+      for (const [key, label, run] of items) {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'dropdown-item-compact';
+        item.setAttribute('role', 'menuitem');
+        item.innerHTML = `<span class="dropdown-icon">${icons[key]}</span><span></span>`;
+        item.lastElementChild.textContent = label;
+        item.addEventListener('click', () => { setOpen(false); run(); });
+        menu.appendChild(item);
+      }
+      importBtn.insertAdjacentElement('afterend', menu);
+      function setOpen(open) {
+        menu.hidden = !open;
+        importBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (!open) return;
+        const r = importBtn.getBoundingClientRect();
+        menu.style.top = `${r.bottom + 2}px`;
+        menu.style.right = `${Math.max(8, window.innerWidth - r.right)}px`;
+        menu.style.left = 'auto';
+        menu.querySelector('button')?.focus();
+      }
+      importBtn.setAttribute('aria-haspopup', 'menu');
+      importBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setOpen(menu.hidden);
+      });
+      menu.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); importBtn.focus(); }
+      });
+      const onOutside = (e) => {
+        // The editor rebuilds its DOM on every open; drop stale listeners.
+        if (!menu.isConnected) { document.removeEventListener('pointerdown', onOutside, true); return; }
+        if (!menu.hidden && !menu.contains(e.target) && !importBtn.contains(e.target)) setOpen(false);
+      };
+      document.addEventListener('pointerdown', onOutside, true);
+    }
+  }
   document.getElementById('ge-import-file')?.addEventListener('click', () => importFileInput.click());
 
   document.getElementById('ge-import-paste')?.addEventListener('click', async () => {

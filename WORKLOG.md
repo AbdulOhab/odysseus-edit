@@ -29,6 +29,9 @@ Newest entry first. Each entry: what changed, how it was verified, what is left.
   compatible chat (OpenAI, OpenRouter, Ollama), OpenAI Images, local diffusion.
 
 **Verified** (Playwright, Chromium, static server, no AI server)
+- Topbar Import now opens a File / Clipboard / Recent menu (upstream's
+  Gallery picker was unreachable); Recent imports a layer, the menu closes on
+  an outside click.
 - Open image → brush → Quick Edit "warmer" adds a White Balance layer →
   autosave "Saved" → Home → draft card with thumbnail → resume.
 - Export dialog downloads; Ctrl+S and Save fall back to a download without a
@@ -38,5 +41,3 @@ Newest entry first. Each entry: what changed, how it was verified, what is left.
 
 **Left**
 - AI server (`server/`) is being ported; Quick Edit planner endpoint next.
-- Topbar Import should offer File / Clipboard / Recent (Recent is unreachable,
-  as upstream's Gallery button was).

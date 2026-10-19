@@ -57,7 +57,8 @@ changing code; add to it when something costs you time. Group by area.
 
 - The "Gallery" import button (now "Recent") lives in `#ge-import-section`,
   which only shows when `state.tool === 'import'`, and no toolbar button sets
-  that tool. It is unreachable in upstream too.
+  that tool. It was unreachable upstream; the topbar Import button now opens a
+  File / Clipboard / Recent menu instead.
 - Quick Edit's "upscale" clicked `#ge-upscale-ai`, which no markup creates. AI
   upscale is now `runAiUpscale(scale, btn)` returned from `wireAIToolsMisc`.
 
