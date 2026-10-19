@@ -3,6 +3,8 @@
  *
  * All pure DOM. Caller wires every ID via document.getElementById /
  * el.querySelector after appending.
+ *
+ * Modified for Odysseus-Edit (2026-10-19): shortcut label for Save As. See NOTICE.md.
  */
 
 import { TOOL_SHORTCUTS } from '../tool-shortcuts.js';
@@ -40,7 +42,7 @@ export function shortcutsPopupHTML() {
           <div><kbd>Ctrl</kbd>+<kbd>Z</kbd> Undo</div>
           <div><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> Redo</div>
           <div><kbd>Ctrl</kbd>+<kbd>S</kbd> Save</div>
-          <div><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> Save to Gallery</div>
+          <div><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> Save As</div>
           <div><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>J</kbd> New Layer</div>
           <div><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>G</kbd> Clipping Mask</div>
           <div><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd> Free Transform</div>

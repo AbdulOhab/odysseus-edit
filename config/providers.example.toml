@@ -1,0 +1,95 @@
+# Odysseus-Edit AI provider configuration.
+#
+# Copy this file to config/providers.toml and edit it. That copy is ignored by git.
+# API keys never go in this file. Each provider names an environment variable
+# (api_key_env), and you put the key itself in .env or your shell environment.
+#
+# kind:
+#   anthropic      Anthropic Messages API (/v1/messages). Works with Anthropic
+#                  and with Anthropic-compatible vendors such as Z.ai GLM.
+#   openai         OpenAI-compatible Chat Completions (/chat/completions).
+#                  Works with OpenAI, OpenRouter, Ollama, LM Studio, vLLM and
+#                  Z.ai's PaaS endpoint.
+#   openai-images  OpenAI-compatible Images API (/images/generations, /images/edits).
+#   diffusion      Self-hosted diffusion server with the Odysseus Cookbook API
+#                  (/v1/images/generations, /v1/images/inpaint).
+#
+# capabilities:
+#   chat        text LLM, used by the Quick Edit planner
+#   vision      the LLM also accepts images (a preview of the canvas is sent)
+#   image-gen   text-to-image generation
+#   image-edit  image + mask editing (inpaint, harmonize, style transfer)
+#
+# auth (anthropic kind only):
+#   x-api-key   send the key as `x-api-key` (api.anthropic.com)
+#   bearer      send `Authorization: Bearer <key>` (Z.ai and most proxies)
+
+[defaults]
+# Provider id and model used by the Quick Edit planner.
+llm = "zai"
+llm_model = "glm-5.3"
+
+# --- Text / vision LLMs -------------------------------------------------------
+
+[[providers]]
+id = "zai"
+name = "Z.ai GLM"
+kind = "anthropic"
+base_url = "https://api.z.ai/api/anthropic"
+api_key_env = "ZAI_API_KEY"
+auth = "bearer"
+models = ["glm-5.3", "glm-5.3-flash"]
+capabilities = ["chat"]
+enabled = true
+
+[[providers]]
+id = "anthropic"
+name = "Anthropic Claude"
+kind = "anthropic"
+base_url = "https://api.anthropic.com"
+api_key_env = "ANTHROPIC_API_KEY"
+auth = "x-api-key"
+models = ["claude-sonnet-5-5", "claude-haiku-5-5"]
+capabilities = ["chat", "vision"]
+enabled = false
+
+[[providers]]
+id = "openai"
+name = "OpenAI"
+kind = "openai"
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+models = []            # fill in the chat model ids you want to offer
+capabilities = ["chat", "vision"]
+enabled = false
+
+[[providers]]
+id = "ollama"
+name = "Ollama (local)"
+kind = "openai"
+base_url = "http://127.0.0.1:11434/v1"
+# no api_key_env: local servers usually need no key
+models = []
+capabilities = ["chat"]
+enabled = false
+
+# --- Image models ---------------------------------------------------------------
+
+[[providers]]
+id = "openai-images"
+name = "OpenAI Images"
+kind = "openai-images"
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+models = ["gpt-image-1"]
+capabilities = ["image-gen", "image-edit"]
+enabled = false
+
+[[providers]]
+id = "local-diffusion"
+name = "Local diffusion server"
+kind = "diffusion"
+base_url = "http://127.0.0.1:7860"
+models = []
+capabilities = ["image-gen", "image-edit"]
+enabled = false

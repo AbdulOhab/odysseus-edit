@@ -29,6 +29,9 @@
  * }} deps
  *
  * @returns {{ addEmptyLayer: () => void }}
+ *
+ * Modified for Odysseus-Edit (2026-10-19): AI upscale is a callable
+ * runAiUpscale(scale, btn) so Quick Edit can run it. See NOTICE.md.
  */
 import { state } from './state.js';
 import { beginAIOperation, decodeAIImage } from './ai-operation.js';
@@ -102,9 +105,11 @@ export function wireAIToolsMisc({
   document.getElementById('ge-upscale-4x')?.addEventListener('click', () => canvasUpscale(4));
 
   // ── AI upscale (Real-ESRGAN, no diffusion server required) ──
-  document.getElementById('ge-upscale-ai')?.addEventListener('click', async () => {
-    const btn = document.getElementById('ge-upscale-ai');
+  // Also callable from Quick Edit with any busy button (returns success).
+  async function runAiUpscale(scale = 2, btn = document.getElementById('ge-upscale-ai')) {
+    if (!btn) return false;
     const origHTML = btn.innerHTML;
+    let ok = false;
     const operation = beginAIOperation(btn, () => uiModule?.showToast('Upscale cancelled'));
     let upWp = null;
     try {
@@ -123,7 +128,7 @@ export function wireAIToolsMisc({
         signal: operation.signal,
         method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: imageB64, scale: 2 }),
+        body: JSON.stringify({ image: imageB64, scale: scale === 4 ? 4 : 2 }),
       });
       if (!res.ok) throw new Error('Server returned ' + res.status);
       const data = await res.json();
@@ -147,6 +152,7 @@ export function wireAIToolsMisc({
           composite();
           renderLayerPanel();
           uiModule.showToast(`AI upscaled to ${newW}×${newH}`);
+          ok = true;
         }
       } else {
         throw new Error(data.error || 'No image returned');
@@ -159,7 +165,9 @@ export function wireAIToolsMisc({
       btn.disabled = false;
       btn.innerHTML = origHTML;
     }
-  });
+    return ok;
+  }
+  document.getElementById('ge-upscale-ai')?.addEventListener('click', () => runAiUpscale(2));
 
   // ── Style transfer ──
   document.getElementById('ge-style-strength')?.addEventListener('input', (e) => {
@@ -267,5 +275,5 @@ export function wireAIToolsMisc({
     });
   });
 
-  return { addEmptyLayer };
+  return { addEmptyLayer, runAiUpscale };
 }

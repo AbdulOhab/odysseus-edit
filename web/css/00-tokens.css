@@ -1,5 +1,8 @@
 /* 00-tokens - part of the former static/style.css.
  *
+ * Modified for Odysseus-Edit (2026-10-19): font URLs point at ../fonts and the
+ * unused OpenDyslexic faces are removed. See NOTICE.md.
+ *
  * The stylesheet is split by area, but the split is mechanical: rules were
  * moved verbatim and NOT regrouped. The numeric prefix is the load order, and
  * that order is what preserves the cascade. A rule sits in the file its
@@ -126,14 +129,11 @@ body {
 }
 
 /* Self-hosted Fira Code font */
-@font-face { font-family: 'Fira Code'; font-weight: 300; font-style: normal; font-display: swap; src: url('/static/fonts/FiraCode-Light.woff2') format('woff2'); }
-@font-face { font-family: 'Fira Code'; font-weight: 400; font-style: normal; font-display: swap; src: url('/static/fonts/FiraCode-Regular.woff2') format('woff2'); }
-@font-face { font-family: 'Fira Code'; font-weight: 600; font-style: normal; font-display: swap; src: url('/static/fonts/FiraCode-SemiBold.woff2') format('woff2'); }
+@font-face { font-family: 'Fira Code'; font-weight: 300; font-style: normal; font-display: swap; src: url('../fonts/FiraCode-Light.woff2') format('woff2'); }
+@font-face { font-family: 'Fira Code'; font-weight: 400; font-style: normal; font-display: swap; src: url('../fonts/FiraCode-Regular.woff2') format('woff2'); }
+@font-face { font-family: 'Fira Code'; font-weight: 600; font-style: normal; font-display: swap; src: url('../fonts/FiraCode-SemiBold.woff2') format('woff2'); }
 
 
-/* Self-hosted OpenDyslexic — dyslexia-friendly accessibility font option (SIL OFL 1.1) */
-@font-face { font-family: 'OpenDyslexic'; font-weight: 400; font-style: normal; font-display: swap; src: url('/static/fonts/OpenDyslexic-Regular.woff2') format('woff2'); }
-@font-face { font-family: 'OpenDyslexic'; font-weight: 700; font-style: normal; font-display: swap; src: url('/static/fonts/OpenDyslexic-Bold.woff2') format('woff2'); }
 
 /* Code block baseline */
 pre, code, .hljs {

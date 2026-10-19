@@ -5,8 +5,8 @@
  *   #ge-import-topbar    topbar "+ Import" button
  *   #ge-import-file      File button in the Import section
  *   #ge-import-paste     Clipboard button (uses async clipboard API)
- *   #ge-import-gallery   Gallery picker — fetches /api/gallery/library
- *                        and shows a thumbnail grid overlay
+ *   #ge-import-gallery   Recent-images picker — lists images opened earlier
+ *                        (host.images) and shows a thumbnail grid overlay
  *
  * Plus the shared `handleImportedImage(img)` sink — scales to canvas,
  * centres, creates a new layer, switches to Move tool, hides the
@@ -24,8 +24,12 @@
  * }} deps
  *
  * @returns {{ handleImportedImage: (img: HTMLImageElement) => void }}
+ *
+ * Modified for Odysseus-Edit (2026-10-19): the Gallery picker lists recent
+ * images from ../../app/host.js instead of /api/gallery/library. See NOTICE.md.
  */
 import { state } from './state.js';
+import { host } from '../../app/host.js';
 import {
   createPlacedData,
   initialPlacedMatrix,
@@ -125,21 +129,19 @@ export function wireImport({ container, saveState, createLayer, composite, rende
     }
   });
 
-  // Import from Gallery — fetch /api/gallery/library and show a
+  // Import from recent images (kept in IndexedDB by the host) and show a
   // thumbnail-grid picker overlay.
   document.getElementById('ge-import-gallery')?.addEventListener('click', async () => {
     try {
-      const res = await fetch('/api/gallery/library?limit=50', { credentials: 'same-origin' });
-      const data = await res.json();
-      const items = data.items || [];
-      if (!items.length) { if (uiModule) uiModule.showToast('No images in gallery'); return; }
+      const items = await host.images.list(50);
+      if (!items.length) { if (uiModule) uiModule.showToast('No recent images yet. Open one from the start page first.', 4000); return; }
 
       // Picker overlay.
       const overlay = document.createElement('div');
       overlay.style.cssText = 'position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;';
       const panel = document.createElement('div');
       panel.style.cssText = 'background:var(--panel,#1e1e1e);border-radius:12px;padding:16px;max-width:500px;max-height:70vh;overflow-y:auto;width:90%;';
-      panel.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><span style="font-size:13px;font-weight:600;">Pick from Gallery</span><button id="ge-gallery-close" style="background:none;border:none;color:var(--fg);cursor:pointer;font-size:18px;">✕</button></div>';
+      panel.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><span style="font-size:13px;font-weight:600;">Recent images</span><button id="ge-gallery-close" style="background:none;border:none;color:var(--fg);cursor:pointer;font-size:18px;">✕</button></div>';
       const grid = document.createElement('div');
       grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:6px;';
       for (const item of items) {
@@ -152,8 +154,8 @@ export function wireImport({ container, saveState, createLayer, composite, rende
           overlay.remove();
           const img = new Image();
           img.crossOrigin = 'anonymous';
-          img.onload = () => handleImportedImage(img, item.name || item.filename || 'Gallery image');
-          img.onerror = () => { if (uiModule) uiModule.showToast('Failed to load gallery image'); };
+          img.onload = () => handleImportedImage(img, item.name || 'Recent image');
+          img.onerror = () => { if (uiModule) uiModule.showToast('Failed to load image'); };
           img.src = item.url;
         });
         grid.appendChild(thumb);
@@ -164,7 +166,7 @@ export function wireImport({ container, saveState, createLayer, composite, rende
       overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
       panel.querySelector('#ge-gallery-close').addEventListener('click', () => overlay.remove());
     } catch (e) {
-      if (uiModule) uiModule.showToast('Failed to load gallery: ' + e.message);
+      if (uiModule) uiModule.showToast('Failed to load recent images: ' + e.message);
     }
   });
 

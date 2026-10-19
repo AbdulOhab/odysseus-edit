@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Odysseus-Edit</title>
+  <meta name="description" content="A layered image editor that runs in your browser, with optional AI tools.">
+  <link rel="icon" href="app/icon.svg" type="image/svg+xml">
+  <script>
+    // Apply the saved theme before first paint to avoid a flash.
+    try {
+      const saved = localStorage.getItem('odysseus-edit.theme');
+      const light = saved ? saved === 'light' : matchMedia('(prefers-color-scheme: light)').matches;
+      if (light) document.documentElement.classList.add('light');
+    } catch {}
+  </script>
+  <!-- Load order mirrors odysseus/static/index.html so the cascade matches. -->
+  <link rel="stylesheet" href="css/00-tokens.css">
+  <link rel="stylesheet" href="css/upstream-pre.css">
+  <link rel="stylesheet" href="css/13-image-editor.css">
+  <link rel="stylesheet" href="css/upstream-post.css">
+  <link rel="stylesheet" href="app/app.css">
+  <link rel="modulepreload" href="js/galleryEditor.js">
+</head>
+<body class="oe-body">
+  <div class="oe-landing" id="oe-landing">
+    <header class="oe-header">
+      <div class="oe-brand">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.5-4.5L7 20"/></svg>
+        <span>Odysseus-Edit</span>
+      </div>
+      <span class="oe-header-spacer"></span>
+      <button type="button" class="oe-status" id="oe-ai-status" data-state="checking" title="AI status">
+        <span class="oe-status-dot" aria-hidden="true"></span>
+        <span class="oe-status-text">Checking AI server…</span>
+      </button>
+      <button type="button" class="oe-icon-btn" id="oe-theme-toggle" title="Toggle light/dark theme" aria-label="Toggle theme">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg>
+      </button>
+    </header>
+
+    <main class="oe-main">
+      <div class="oe-start">
+        <section class="oe-panel" aria-labelledby="oe-open-title">
+          <h2 id="oe-open-title">Open an image</h2>
+          <div class="oe-dropzone" id="oe-dropzone">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M20 15v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4"/></svg>
+            <button type="button" class="oe-btn oe-btn-primary" id="oe-open-btn">Open image…</button>
+            <p>or drop a file here, or paste with Ctrl+V<br>PNG, JPEG, WebP, GIF, BMP, AVIF</p>
+          </div>
+        </section>
+
+        <section class="oe-panel" aria-labelledby="oe-new-title">
+          <h2 id="oe-new-title">New canvas</h2>
+          <div class="oe-presets" id="oe-presets">
+            <button type="button" class="oe-preset" data-w="1920" data-h="1080"><strong>Full HD</strong><span>1920 × 1080</span></button>
+            <button type="button" class="oe-preset" data-w="1080" data-h="1080"><strong>Square post</strong><span>1080 × 1080</span></button>
+            <button type="button" class="oe-preset" data-w="1080" data-h="1350"><strong>Portrait post</strong><span>1080 × 1350</span></button>
+            <button type="button" class="oe-preset" data-w="1080" data-h="1920"><strong>Story</strong><span>1080 × 1920</span></button>
+            <button type="button" class="oe-preset" data-w="2480" data-h="3508"><strong>A4 print</strong><span>2480 × 3508 · 300 dpi</span></button>
+            <button type="button" class="oe-preset" data-custom="true"><strong>Custom size</strong><span>Choose width and height</span></button>
+          </div>
+        </section>
+      </div>
+
+      <section aria-labelledby="oe-drafts-title">
+        <div class="oe-section-head">
+          <h2 id="oe-drafts-title">Recent drafts</h2>
+          <p>Saved automatically in this browser</p>
+        </div>
+        <div class="oe-drafts" id="oe-drafts"></div>
+      </section>
+    </main>
+
+    <footer class="oe-footer">
+      Odysseus-Edit is free software under the
+      <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener">GNU AGPL v3</a>.
+      It is an unofficial editor extracted from
+      <a href="https://github.com/odysseus-dev/odysseus" target="_blank" rel="noopener">Odysseus</a>.
+    </footer>
+  </div>
+
+  <div class="gallery-editor-container" id="gallery-editor-container" style="display:none;"></div>
+  <input type="file" id="oe-file-input" accept="image/*" hidden>
+
+  <script type="module" src="app/main.js"></script>
+</body>
+</html>

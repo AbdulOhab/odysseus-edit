@@ -8,6 +8,8 @@
  *
  * @param {{ color: string, brushSize: number, wandTolerance: number }} ctx
  * @returns {string}
+ *
+ * Modified for Odysseus-Edit (2026-10-19): Cookbook/Gallery labels replaced with standalone wording. See NOTICE.md.
  */
 export function controlsHTML({ color, brushSize, wandTolerance }) {
   const brushSliderValue = Math.round(Math.log(Math.max(1, brushSize)) / Math.log(800) * 1000);
@@ -397,7 +399,7 @@ export function controlsHTML({ color, brushSize, wandTolerance }) {
         <select id="ge-ai-inpaint" class="ge-ai-model" title="Model for inpainting">
           <option value="">Auto</option>
           <option value="" disabled>──────────</option>
-          <option value="__serve_cookbook__">+ Serve a model in Cookbook…</option>
+          <option value="__serve_cookbook__">+ Set up image models…</option>
         </select>
       </div>
       <div class="ge-control-row ge-eraser-row" style="margin-top:6px;">
@@ -529,10 +531,10 @@ export function controlsHTML({ color, brushSize, wandTolerance }) {
       <div class="ge-dep-notice" id="ge-rembg-dep-missing" style="display:none;">
         <div class="ge-dep-notice-text">
           <strong>rembg not installed.</strong>
-          Background Remove needs the <code>rembg</code> package on this
-          server. Click to install it from Cookbook → Dependencies.
+          Background Remove needs the optional <code>rembg</code> package
+          on the AI server.
         </div>
-        <button type="button" class="ge-btn ge-btn-sm" id="ge-rembg-install-link">Install rembg</button>
+        <button type="button" class="ge-btn ge-btn-sm" id="ge-rembg-install-link">How to install</button>
       </div>
       <div class="ge-control-row ge-actions" id="ge-rembg-run-row">
         <button class="ge-btn ge-btn-primary ge-btn-ai" id="ge-rembg-run">
@@ -558,7 +560,7 @@ export function controlsHTML({ color, brushSize, wandTolerance }) {
       <div class="ge-control-row ge-actions">
         <button class="ge-btn" id="ge-import-file">File</button>
         <button class="ge-btn" id="ge-import-paste">Clipboard</button>
-        <button class="ge-btn" id="ge-import-gallery">Gallery</button>
+        <button class="ge-btn" id="ge-import-gallery">Recent</button>
       </div>
     </div>
     <div class="ge-harmonize-section" id="ge-harmonize-section" style="display:none;">

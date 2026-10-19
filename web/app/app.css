@@ -1,0 +1,442 @@
+/* Odysseus-Edit shell: start page, toasts, dialogs, minimised-panel dock,
+ * and the bits of editor chrome that differ from Odysseus.
+ * Colours come from the upstream tokens in css/00-tokens.css (dark by
+ * default, :root.light for the light theme). */
+
+:root {
+  --oe-muted: color-mix(in srgb, var(--fg) 62%, var(--bg));
+  --oe-faint: color-mix(in srgb, var(--fg) 14%, transparent);
+  --oe-card: color-mix(in srgb, var(--panel) 70%, var(--bg));
+  --oe-accent: var(--red);
+  --oe-radius: 10px;
+  --oe-font: 'Fira Code', ui-monospace, monospace;
+}
+
+/* Upstream's body is a non-scrolling flex shell for the workspace; the
+   start page scrolls. The editor overlays everything when open. */
+body.oe-body {
+  display: block;
+  overflow: auto;
+  font-family: var(--oe-font);
+}
+body.oe-body.oe-editing { overflow: hidden; }
+
+.gallery-editor-container {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--bg);
+}
+
+/* ── Start page ───────────────────────────────────────────────────────── */
+
+.oe-landing {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.oe-landing[hidden] { display: none; }
+
+.oe-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--oe-faint);
+}
+.oe-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+.oe-brand svg { color: var(--oe-accent); flex: none; }
+.oe-header-spacer { flex: 1; }
+
+.oe-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--oe-muted);
+  border: 1px solid var(--oe-faint);
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+.oe-status:hover { color: var(--fg); border-color: var(--border); }
+.oe-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-muted);
+}
+.oe-status[data-state="online"] .oe-status-dot { background: var(--color-success); }
+.oe-status[data-state="partial"] .oe-status-dot { background: var(--warn); }
+
+.oe-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--oe-faint);
+  background: none;
+  color: var(--fg);
+  cursor: pointer;
+}
+.oe-icon-btn:hover { border-color: var(--border); }
+
+.oe-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+.oe-start {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 20px;
+}
+
+.oe-panel {
+  background: var(--oe-card);
+  border: 1px solid var(--oe-faint);
+  border-radius: var(--oe-radius);
+  padding: 20px;
+}
+.oe-panel h2,
+.oe-section-head h2 {
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--oe-muted);
+}
+
+.oe-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 220px;
+  border: 1.5px dashed var(--border);
+  border-radius: var(--oe-radius);
+  text-align: center;
+  padding: 24px;
+  transition: border-color 120ms, background-color 120ms;
+}
+.oe-dropzone svg { color: var(--oe-muted); }
+.oe-dropzone p { margin: 0; color: var(--oe-muted); font-size: 12px; line-height: 1.6; }
+.oe-dropzone.oe-drag-over,
+.oe-landing.oe-drag-over .oe-dropzone {
+  border-color: var(--oe-accent);
+  background: color-mix(in srgb, var(--oe-accent) 8%, transparent);
+}
+
+.oe-btn {
+  font-family: inherit;
+  font-size: 12px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--fg);
+  cursor: pointer;
+}
+.oe-btn:hover { border-color: var(--oe-accent); }
+.oe-btn:focus-visible,
+.oe-icon-btn:focus-visible,
+.oe-preset:focus-visible,
+.oe-draft-open:focus-visible { outline: 2px solid var(--oe-accent); outline-offset: 2px; }
+.oe-btn-primary {
+  background: var(--oe-accent);
+  border-color: var(--oe-accent);
+  color: #fff;
+  font-weight: 600;
+}
+.oe-btn-primary:hover { filter: brightness(1.08); }
+.oe-btn-danger { background: var(--color-danger); border-color: var(--color-danger); color: #fff; }
+
+.oe-presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.oe-preset {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--oe-faint);
+  background: none;
+  color: var(--fg);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.oe-preset:hover { border-color: var(--oe-accent); }
+.oe-preset strong { font-size: 12px; font-weight: 600; }
+.oe-preset span { font-size: 11px; color: var(--oe-muted); }
+
+.oe-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.oe-section-head p { margin: 0; font-size: 11px; color: var(--oe-muted); }
+
+.oe-drafts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+}
+.oe-draft {
+  position: relative;
+  border: 1px solid var(--oe-faint);
+  border-radius: var(--oe-radius);
+  background: var(--oe-card);
+  overflow: hidden;
+}
+.oe-draft:hover { border-color: var(--border); }
+.oe-draft-open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.oe-draft-thumb {
+  aspect-ratio: 4 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--panel);
+  background-image:
+    linear-gradient(45deg, var(--oe-faint) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--oe-faint) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--oe-faint) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--oe-faint) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+.oe-draft-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.oe-draft-meta { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 4px; }
+.oe-draft-name {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.oe-draft-info { font-size: 11px; color: var(--oe-muted); }
+.oe-draft-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--oe-faint);
+  background: color-mix(in srgb, var(--panel) 85%, transparent);
+  color: var(--fg);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.oe-draft:hover .oe-draft-delete,
+.oe-draft-delete:focus-visible { opacity: 1; }
+.oe-draft-delete:hover { color: var(--color-error); border-color: var(--color-error); }
+@media (hover: none) { .oe-draft-delete { opacity: 1; } }
+
+.oe-empty {
+  grid-column: 1 / -1;
+  border: 1px dashed var(--oe-faint);
+  border-radius: var(--oe-radius);
+  padding: 28px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--oe-muted);
+}
+
+.oe-footer {
+  padding: 16px 24px 24px;
+  font-size: 11px;
+  color: var(--oe-muted);
+  text-align: center;
+  line-height: 1.7;
+}
+.oe-footer a { color: inherit; }
+.oe-footer a:hover { color: var(--fg); }
+
+@media (max-width: 760px) {
+  .oe-start { grid-template-columns: minmax(0, 1fr); }
+  .oe-header { padding: 12px 16px; flex-wrap: wrap; }
+  .oe-main { padding: 20px 16px 36px; }
+  .oe-status-text { display: none; }
+}
+
+/* ── Toast (shim for upstream ui.showToast) ─────────────────────────────── */
+
+.oe-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translate(-50%, 16px);
+  z-index: 20000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--fg);
+  font: 12px/1.5 var(--oe-font);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms, transform 160ms;
+}
+.oe-toast.oe-toast-show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.oe-toast.oe-toast-error { border-color: var(--color-error); }
+.oe-toast-action {
+  flex: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--oe-accent);
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  padding: 3px 9px;
+  cursor: pointer;
+}
+
+/* ── Dialogs (confirm + setup help) ─────────────────────────────────────── */
+
+.oe-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 19000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.55);
+}
+.oe-dialog {
+  width: min(460px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 20px 22px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--fg);
+  font-family: var(--oe-font);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+.oe-dialog-title { margin: 0 0 10px; font-size: 14px; font-weight: 600; }
+.oe-dialog-msg { margin: 0 0 18px; font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
+.oe-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.oe-help-body { font-size: 12px; line-height: 1.65; margin-bottom: 16px; }
+.oe-help-body p { margin: 0 0 10px; }
+.oe-help-body ul { margin: 0 0 10px; padding-left: 18px; }
+.oe-help-body pre {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--oe-faint);
+  overflow-x: auto;
+}
+.oe-help-body code { font-family: var(--oe-font); font-size: 11px; }
+
+/* ── Minimised panel dock (shim for upstream modalManager) ──────────────── */
+
+.oe-dock {
+  position: fixed;
+  left: 72px;
+  bottom: 12px;
+  z-index: 9000;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: calc(100vw - 96px);
+}
+.oe-dock-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--fg);
+  font: 11px var(--oe-font);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+}
+.oe-dock-restore,
+.oe-dock-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 6px 8px;
+}
+.oe-dock-restore svg { width: 13px; height: 13px; }
+.oe-dock-close { padding-left: 2px; color: var(--oe-muted); }
+.oe-dock-close:hover { color: var(--color-error); }
+
+/* ── Editor chrome ─────────────────────────────────────────────────────── */
+
+/* AI tools need the optional server; hide them when it is not running. */
+:root.oe-ai-offline .ge-tool-btn.is-ai { display: none !important; }
+
+.ge-ai-command-model {
+  max-width: 180px;
+  margin-left: auto;
+  font: 11px var(--oe-font);
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--oe-faint);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+.ge-ai-command-model[hidden] { display: none; }
+.ge-ai-command-model + .ge-ai-command-close { margin-left: 6px; }
+
+/* Upstream's light theme paints every button grey with
+   `:root.light button` (specificity 0,2,1). The editor keeps that look; the
+   shell's own buttons match the specificity and win by coming later. */
+html:root .oe-btn { background: var(--panel); }
+html:root .oe-btn-primary { background: var(--oe-accent); }
+html:root .oe-btn-danger { background: var(--color-danger); }
+html:root :is(.oe-status, .oe-icon-btn, .oe-preset, .oe-draft-open, .oe-toast-action, .oe-dock-restore, .oe-dock-close) {
+  background: none;
+}
+html:root .oe-draft-delete { background: color-mix(in srgb, var(--panel) 85%, transparent); }

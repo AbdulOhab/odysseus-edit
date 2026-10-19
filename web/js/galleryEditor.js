@@ -1,12 +1,18 @@
 /**
  * Gallery Editor — canvas-based image editor with layers, brush, eraser, text, crop, inpaint mask.
+ *
+ * Modified for Odysseus-Edit (2026-10-19): drafts, saving, recent images and
+ * AI setup help go through ../app/host.js instead of the Odysseus server
+ * (gallery, server-side drafts, Cookbook). See NOTICE.md.
  */
 
-import uiModule from './ui.js?v=20260916largetoolscroll1';
+import uiModule from './ui.js';
 import dragSortModule from './dragSort.js';
 import spinnerModule from './spinner.js';
-import { attachColorPicker } from './colorPicker.js?v=20260910eyedropper1';
+import { attachColorPicker } from './colorPicker.js';
 import modalManager from './modalManager.js';
+import { host } from '../app/host.js';
+import * as _aiPlanner from '../app/ai-planner.js';
 import { canvasCoords as _canvasCoords } from './editor/canvas-coords.js';
 import { drawCheckerboard as _drawCheckerboard } from './editor/checkerboard.js';
 import { dilateMask as _dilateMask, applyInpaintFeather as _applyInpaintFeather } from './editor/mask-utils.js';
@@ -72,12 +78,12 @@ import {
   drawAdjustmentLayerAsync as _drawAdjustmentLayerAsync,
   normalizeAdjustmentData as _normalizeAdjustmentData,
 } from './editor/adjustment-layer.js';
-import { buildToolbar as _buildToolbar } from './editor/build/toolbar.js?v=20260830editor2';
+import { buildToolbar as _buildToolbar } from './editor/build/toolbar.js';
 import { buildTopbar as _buildTopbar, buildZoomFooter as _buildZoomFooter } from './editor/build/topbar.js';
 import {
   controlsHTML as _controlsHTML,
   layerPanelHTML as _layerPanelHTML,
-} from './editor/build/controls.js?v=20260830editor2';
+} from './editor/build/controls.js';
 import {
   transformPopupHTML as _transformPopupHTML,
   attachSpinRepeat as _attachSpinRepeat,
@@ -176,14 +182,14 @@ import { createShortcutsPopover } from './editor/shortcuts-popover.js';
 import { wireKeyboardShortcuts } from './editor/keyboard-shortcuts.js';
 import { wireClipboardAndDrop } from './editor/clipboard-and-drop.js';
 import { wireAIModelSelectors, resolveInpaintModel } from './editor/ai-models.js';
-import { wireInpaintButtons } from './editor/ai-inpaint.js?v=20260708match1';
+import { wireInpaintButtons } from './editor/ai-inpaint.js';
 import { wireAIToolsMisc } from './editor/ai-tools-misc.js';
 import { wireRembgAndSharpen } from './editor/ai-rembg.js';
 import { wireStrokeToolSliders } from './editor/stroke-tool-sliders.js';
 import { wireImport } from './editor/wire-import.js';
 import { wireMergeButtons } from './editor/wire-merge-buttons.js';
 import { wireSelectionControls } from './editor/wire-selection-controls.js';
-import { wireInpaintControls } from './editor/wire-inpaint-controls.js?v=20260708match1';
+import { wireInpaintControls } from './editor/wire-inpaint-controls.js';
 import { wireTopbar, closeOtherTopbarMenus as _closeOtherTopbarMenus } from './editor/wire-topbar.js';
 import { wireTopbarOverflow } from './editor/wire-topbar-overflow.js';
 import { wireTopbarMenus } from './editor/wire-topbar-menus.js';
@@ -560,6 +566,342 @@ function _openSamPrompt() {
   });
 }
 
+// ── Quick Edit actions ──────────────────────────────────────────────────
+// Odysseus-Edit: built-in commands and the language-model planner both
+// produce a list of actions in one small vocabulary, run here. Adjustments
+// become ordinary adjustment layers, so every step is visible and undoable.
+// Numbers arrive in slider units (mostly -100..100) and are clamped.
+
+let _runAiUpscale = null;
+
+function _qeNum(value, min, max, fallback) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+}
+
+function _qeColor(value, fallback) {
+  return /^#[0-9a-f]{6}$/i.test(String(value || '')) ? String(value) : fallback;
+}
+
+function _qeRgb(value) {
+  return {
+    r: _qeNum(value?.r, -100, 100, 0),
+    g: _qeNum(value?.g, -100, 100, 0),
+    b: _qeNum(value?.b, -100, 100, 0),
+  };
+}
+
+// Map a planner action to an adjustment-layer spec, or null if it is not one.
+function _qeAdjustment(action) {
+  const a = action || {};
+  switch (a.type) {
+    case 'brightness_contrast':
+      return { type: 'brightness-contrast', params: {
+        brightness: 1 + _qeNum(a.brightness, -100, 100, 0) / 100,
+        contrast: 1 + _qeNum(a.contrast, -100, 100, 0) / 100,
+      } };
+    case 'exposure':
+      return { type: 'exposure', params: { exposure: _qeNum(a.ev, -5, 5, 0), offset: 0, gamma: 1 } };
+    case 'white_balance':
+      return { type: 'white-balance', params: {
+        temperature: _qeNum(a.temperature, -100, 100, 0),
+        tint: _qeNum(a.tint, -100, 100, 0),
+      } };
+    case 'hue_saturation':
+      return { type: 'hue-saturation', params: {
+        hue: _qeNum(a.hue, -180, 180, 0),
+        saturation: 1 + _qeNum(a.saturation, -100, 100, 0) / 100,
+        lightness: _qeNum(a.lightness, -100, 100, 0),
+      } };
+    case 'vibrance':
+      return { type: 'vibrance', params: { vibrance: _qeNum(a.amount, -100, 100, 0) } };
+    case 'black_white':
+      return { type: 'black-white', params: {} };
+    case 'shadows_highlights':
+      return { type: 'shadows-highlights', params: {
+        shadows: _qeNum(a.shadows, -100, 100, 0),
+        highlights: _qeNum(a.highlights, -100, 100, 0),
+      } };
+    case 'levels': {
+      const black = Math.round(_qeNum(a.black, 0, 253, 0));
+      const white = Math.round(_qeNum(a.white, black + 2, 255, 255));
+      return { type: 'levels', params: {
+        channel: 'rgb', inBlack: black, inWhite: white,
+        gamma: _qeNum(a.gamma, 0.1, 9.9, 1), outBlack: 0, outWhite: 255,
+      } };
+    }
+    case 'curves': {
+      const raw = Array.isArray(a.points) ? a.points : [];
+      const points = raw
+        .filter(pt => Array.isArray(pt) && pt.length === 2)
+        .map(([x, y]) => [Math.round(_qeNum(x, 0, 255, 0)), Math.round(_qeNum(y, 0, 255, 0))])
+        .sort((m, n) => m[0] - n[0])
+        .filter((pt, i, arr) => i === 0 || pt[0] !== arr[i - 1][0])
+        .slice(0, 16);
+      if (!points.length || points[0][0] !== 0) points.unshift([0, 0]);
+      if (points[points.length - 1][0] !== 255) points.push([255, 255]);
+      return { type: 'curves', params: { channel: 'rgb', points: { rgb: points } } };
+    }
+    case 'color_balance': {
+      const params = {};
+      for (const tone of ['shadows', 'midtones', 'highlights']) {
+        if (a[tone] && typeof a[tone] === 'object') params[tone] = _qeRgb(a[tone]);
+      }
+      if (!Object.keys(params).length) {
+        const tone = ['shadows', 'midtones', 'highlights'].includes(a.tone) ? a.tone : 'midtones';
+        params[tone] = _qeRgb(a);
+      }
+      return { type: 'color-balance', params };
+    }
+    case 'gradient_map':
+      return { type: 'gradient-map', params: {
+        shadows: _qeColor(a.shadows, '#000000'),
+        highlights: _qeColor(a.highlights, '#ffffff'),
+        midpoint: _qeNum(a.midpoint, 0, 100, 50),
+        reverse: a.reverse === true,
+      } };
+    default:
+      return null;
+  }
+}
+
+// Add an adjustment layer at the top of the stack so it applies to the
+// whole document, without opening the adjustment popup.
+function _addQuickEditAdjustment(spec, label) {
+  _saveState(`Add ${label} adjustment layer`);
+  const layer = createLayer(label, state.imgWidth, state.imgHeight);
+  layer.kind = 'adjustment';
+  layer.adjustment = { type: spec.type, params: { ..._defaultAdjParams(spec.type), ...spec.params } };
+  layer.locks = { pixels: true, transparency: true, position: true };
+  state.layers.push(layer);
+  state.activeLayerId = layer.id;
+  state.selectedLayerIds = [layer.id];
+  _renderLayerPanel();
+  composite();
+  return layer;
+}
+
+async function _requireAiServer(helpTopic = 'server') {
+  if (await host.getCapabilities()) return;
+  const err = new Error('This edit needs the Odysseus-Edit AI server, which is not running.');
+  err.helpTopic = helpTopic;
+  throw err;
+}
+
+function _runToolButtonOrThrow(toolId, buttonId, status) {
+  _clickToolButton(toolId);
+  const target = _runExistingButton(buttonId, status);
+  if (!target) throw new Error('That edit is not available in this editor state.');
+  return _waitForExistingButton(target);
+}
+
+const _QE_LABELS = {
+  rotate: 'Rotate', flip: 'Flip', remove_background: 'Remove background', upscale: 'Upscale',
+  denoise: 'Denoise', sharpen: 'Sharpen', enhance_face: 'Enhance face', style_edit: 'Style edit',
+};
+
+/**
+ * Run Quick Edit actions in order. Stops at the first failure (earlier
+ * steps stay applied and can be undone). Unknown action types are skipped.
+ */
+async function _runQuickEditActions(actions, runBtn, { summary = '' } = {}) {
+  const list = Array.isArray(actions) ? actions.slice(0, 12) : [];
+  const applied = [];
+  const skipped = [];
+  for (const action of list) {
+    const type = String(action?.type || '');
+    const adj = _qeAdjustment(action);
+    if (adj) {
+      const label = typeof action.label === 'string' && action.label.trim()
+        ? action.label.trim().slice(0, 40)
+        : _adjLayerLabel(adj.type);
+      _setAiCommandStatus(`Adding ${label}…`, 'running');
+      _addQuickEditAdjustment(adj, label);
+      applied.push(label);
+      continue;
+    }
+    switch (type) {
+      case 'rotate': {
+        const raw = Math.round(Number(action.degrees) || 90);
+        const deg = ((raw % 360) + 360) % 360;
+        _rotateAllLayers([90, 180, 270].includes(deg) ? deg : 90);
+        break;
+      }
+      case 'flip':
+        _flipAllLayers(/^v/i.test(String(action.axis || '')) ? 'v' : 'h');
+        break;
+      case 'remove_background':
+        await _requireAiServer();
+        await _runToolButtonOrThrow('rembg', 'ge-rembg-run', 'Removing background...');
+        break;
+      case 'upscale':
+        await _requireAiServer();
+        _setAiCommandStatus('Upscaling image...', 'running');
+        if (!_runAiUpscale || !(await _runAiUpscale(Number(action.scale) === 4 ? 4 : 2, runBtn))) {
+          throw new Error('Upscale failed.');
+        }
+        break;
+      case 'denoise':
+        await _requireAiServer();
+        _setAiCommandStatus('Denoising image...', 'running');
+        await _applyImageTool('/api/image/denoise', { strength: _qeNum(action.strength, 0.05, 1, 0.55) },
+          'Denoised', runBtn, { busyLabel: 'Denoising...' });
+        break;
+      case 'enhance_face':
+        await _requireAiServer();
+        _setAiCommandStatus('Enhancing face/portrait...', 'running');
+        await _applyImageTool('/api/image/enhance-face', {}, 'Enhanced Face', runBtn, { busyLabel: 'Enhancing...' });
+        break;
+      case 'sharpen': {
+        await _requireAiServer();
+        const amount = document.getElementById('ge-sharpen-amount');
+        if (amount) {
+          amount.value = String(Math.round(_qeNum(action.amount, 10, 100, 65)));
+          amount.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        await _runToolButtonOrThrow('sharpen', 'ge-sharpen-run', 'Sharpening image...');
+        break;
+      }
+      case 'style_edit': {
+        await _requireAiServer('image-model');
+        const stylePrompt = String(action.prompt || '').trim();
+        if (!stylePrompt) throw new Error('A style edit needs a description.');
+        const promptEl = document.getElementById('ge-style-prompt');
+        const strengthEl = document.getElementById('ge-style-strength');
+        if (promptEl) promptEl.value = stylePrompt;
+        if (strengthEl) {
+          strengthEl.value = String(Math.round(_qeNum(action.strength, 0.1, 0.9, 0.55) * 100));
+          strengthEl.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        await _runToolButtonOrThrow('style', 'ge-style-run', 'Running full-image AI edit...');
+        break;
+      }
+      default:
+        skipped.push(type || 'unknown');
+        continue;
+    }
+    applied.push(_QE_LABELS[type] || type);
+  }
+  const parts = [];
+  if (summary) parts.push(summary);
+  else if (applied.length) parts.push(`Applied: ${applied.join(', ')}.`);
+  if (skipped.length) parts.push(`Skipped unsupported: ${skipped.join(', ')}.`);
+  if (!applied.length && !summary) parts.push('Nothing was changed.');
+  // Rotations re-layout the canvas on the next frame; report after it.
+  requestAnimationFrame(() => _setAiCommandStatus(parts.join(' '), applied.length ? 'done' : 'error'));
+  return { applied, skipped };
+}
+
+/**
+ * Built-in command matching. strict: only whole, short commands (used even
+ * when a language model is configured). Loose: upstream's keyword rules,
+ * where anything unmatched becomes a full-image style edit.
+ */
+function _matchQuickEditCommand(p, prompt, { strict }) {
+  const text = p.trim().replace(/\s+/g, ' ').replace(/[.!]+$/, '');
+  if (strict) {
+    if (/^rotate( 90| right| clockwise)?$/.test(text)) return [{ type: 'rotate', degrees: 90 }];
+    if (/^rotate (left|ccw|counter ?clockwise|-90|270)$/.test(text)) return [{ type: 'rotate', degrees: 270 }];
+    if (/^(rotate 180|upside down)$/.test(text)) return [{ type: 'rotate', degrees: 180 }];
+    if (/^(flip|mirror)( horizontal(ly)?| h)?$/.test(text)) return [{ type: 'flip', axis: 'h' }];
+    if (/^(flip|mirror) (vertical(ly)?|v)$/.test(text)) return [{ type: 'flip', axis: 'v' }];
+    if (/^remove (the )?(bg|background)$/.test(text)) return [{ type: 'remove_background' }];
+    const up = text.match(/^upscale( (2|4)x)?$/);
+    if (up) return [{ type: 'upscale', scale: up[2] === '4' ? 4 : 2 }];
+    if (text === 'denoise') return [{ type: 'denoise', strength: 0.55 }];
+    if (text === 'sharpen') return [{ type: 'sharpen', amount: 65 }];
+    if (text === 'enhance face') return [{ type: 'enhance_face' }];
+    if (/^(black (and|&) white|b&w|gr[ae]yscale)$/.test(text)) return [{ type: 'black_white' }];
+    if (/^warm(er)?$/.test(text)) return [{ type: 'white_balance', temperature: 25 }];
+    if (/^cool(er)?$/.test(text)) return [{ type: 'white_balance', temperature: -25 }];
+    if (/^bright(er|en)?$/.test(text)) return [{ type: 'brightness_contrast', brightness: 15 }];
+    if (/^dark(er|en)?$/.test(text)) return [{ type: 'brightness_contrast', brightness: -15 }];
+    if (/^more contrast$/.test(text)) return [{ type: 'brightness_contrast', contrast: 20 }];
+    if (/^(vivid|vibrant|more vibrant)$/.test(text)) return [{ type: 'vibrance', amount: 35 }];
+    const style = prompt.trim().match(/^style:\s*(.+)$/i);
+    if (style) return [{ type: 'style_edit', prompt: style[1], strength: 0.55 }];
+    return null;
+  }
+  if (/\brotate\b.*\b180\b|\bupside\s*down\b/.test(p)) return [{ type: 'rotate', degrees: 180 }];
+  if (/\brotate\b.*\b(left|ccw|counter)\b|\bturn\s+left\b/.test(p)) return [{ type: 'rotate', degrees: 270 }];
+  if (/\brotate\b|\bturn\s+right\b|\bclockwise\b/.test(p)) return [{ type: 'rotate', degrees: 90 }];
+  if (/\bflip\b.*\b(vertical|v)\b|\bmirror\b.*\b(vertical|v)\b/.test(p)) return [{ type: 'flip', axis: 'v' }];
+  if (/\bflip\b|\bmirror\b/.test(p)) return [{ type: 'flip', axis: 'h' }];
+  if (/\b(remove|erase|cut\s*out|transparent)\b.*\b(bg|background)\b|\b(bg|background)\b.*\b(remove|erase|transparent)\b/.test(p)) {
+    return [{ type: 'remove_background' }];
+  }
+  if (/\b(upscale|higher\s*res|increase\s*resolution|bigger|2x|4x)\b/.test(p)) {
+    return [{ type: 'upscale', scale: /\b4x\b/.test(p) ? 4 : 2 }];
+  }
+  if (/\b(denoise|noise|grain|grainy|clean\s*up)\b/.test(p)) return [{ type: 'denoise', strength: 0.55 }];
+  if (/\b(face|portrait|skin|selfie|restore)\b/.test(p)) return [{ type: 'enhance_face' }];
+  if (/\b(sharpen|sharp|crisp|clearer|make it look better|enhance|improve|better)\b/.test(p)) {
+    return [{ type: 'sharpen', amount: 65 }];
+  }
+  return [{ type: 'style_edit', prompt, strength: /\b(subtle|slight|small)\b/.test(p) ? 0.35 : 0.55 }];
+}
+
+// Document summary sent to the planner (no pixels).
+function _quickEditContext() {
+  const hasSelection = !!(state.wandMask || state.marqueeRect
+    || (Array.isArray(state.lassoPoints) && state.lassoPoints.length > 2));
+  return {
+    width: state.imgWidth,
+    height: state.imgHeight,
+    layers: state.layers.slice(-25).map(layer => ({
+      name: String(layer.name || '').slice(0, 60),
+      kind: layer.kind || 'raster',
+      visible: layer.visible !== false,
+      ...(layer.kind === 'adjustment' ? { adjustment: layer.adjustment?.type || null } : {}),
+    })),
+    active_layer: activeLayer()?.name || null,
+    has_selection: hasSelection,
+  };
+}
+
+// Small JPEG of the flattened document for vision-capable models.
+function _quickEditPreview(maxDim = 768) {
+  try {
+    const flat = flatten();
+    const scale = Math.min(1, maxDim / Math.max(flat.width, flat.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(flat.width * scale));
+    canvas.height = Math.max(1, Math.round(flat.height * scale));
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(flat, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.8);
+  } catch (err) {
+    console.warn('[ge-ai-command] preview failed', err);
+    return null;
+  }
+}
+
+// Fill the Quick Edit model picker from the AI server; stays hidden when
+// no language model is configured (built-in commands still work).
+async function _populateQuickEditModels(select) {
+  if (!select) return;
+  const [choices, selected] = await Promise.all([
+    _aiPlanner.getModelChoices(),
+    _aiPlanner.getSelectedChoice(),
+  ]);
+  if (!select.isConnected || !choices.length) { select.hidden = true; return; }
+  select.innerHTML = '';
+  const builtIn = document.createElement('option');
+  builtIn.value = '';
+  builtIn.textContent = 'Built-in commands';
+  select.appendChild(builtIn);
+  for (const choice of choices) {
+    const opt = document.createElement('option');
+    opt.value = choice.value;
+    opt.textContent = choice.label;
+    select.appendChild(opt);
+  }
+  select.value = selected ? selected.value : '';
+  select.hidden = false;
+}
+
 function _buildAiCommandBox() {
   const wrap = document.createElement('div');
   wrap.className = 'ge-ai-command ge-ai-command-collapsed';
@@ -576,6 +918,7 @@ function _buildAiCommandBox() {
       <span class="ge-btn-ai-mark" aria-hidden="true">✦</span>
       <span class="ge-ai-command-title">Quick Edit</span>
       <span class="ge-ai-command-scope">Document</span>
+      <select class="ge-ai-command-model" id="ge-ai-command-model" title="Language model for Quick Edit" aria-label="Language model" hidden></select>
       <button type="button" class="ge-ai-command-close" id="ge-ai-command-close" title="Collapse Quick Edit" aria-label="Collapse Quick Edit">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <polyline points="6 9 12 15 18 9"></polyline>
@@ -606,6 +949,13 @@ const _AI_COMMAND_SUGGESTIONS = [
   { label: 'Rotate 180', insert: 'rotate 180', hint: 'Flip the canvas upside down', kind: 'Local', aliases: ['rotate 180', 'upside down'] },
   { label: 'Flip horizontal', insert: 'flip horizontal', hint: 'Mirror left to right', kind: 'Local', aliases: ['flip', 'mirror', 'horizontal'] },
   { label: 'Flip vertical', insert: 'flip vertical', hint: 'Mirror top to bottom', kind: 'Local', aliases: ['flip vertical', 'vertical'] },
+  { label: 'Warmer', insert: 'warmer', hint: 'Warm white balance', kind: 'Local', aliases: ['warm', 'warmer', 'golden'] },
+  { label: 'Cooler', insert: 'cooler', hint: 'Cool white balance', kind: 'Local', aliases: ['cool', 'cooler', 'cold', 'blue'] },
+  { label: 'Brighter', insert: 'brighter', hint: 'Raise brightness', kind: 'Local', aliases: ['bright', 'brighter', 'lighter', 'brighten'] },
+  { label: 'Darker', insert: 'darker', hint: 'Lower brightness', kind: 'Local', aliases: ['dark', 'darker', 'darken'] },
+  { label: 'More contrast', insert: 'more contrast', hint: 'Punchier tones', kind: 'Local', aliases: ['contrast', 'punch'] },
+  { label: 'Vivid', insert: 'vivid', hint: 'Boost muted colors', kind: 'Local', aliases: ['vivid', 'vibrant', 'saturate', 'color pop'] },
+  { label: 'Black & white', insert: 'black and white', hint: 'Grayscale adjustment layer', kind: 'Local', aliases: ['black', 'white', 'b&w', 'grayscale', 'greyscale', 'mono'] },
   { label: 'Remove background', insert: 'remove background', hint: 'Make the background transparent', kind: 'AI', aliases: ['remove bg', 'background', 'transparent', 'cut out'] },
   { label: 'Upscale', insert: 'upscale 2x', hint: 'Increase image resolution', kind: 'AI', aliases: ['upscale', 'bigger', 'larger', '2x', '4x'] },
   { label: 'Denoise', insert: 'denoise', hint: 'Reduce grain and noise', kind: 'AI', aliases: ['denoise', 'noise', 'grain', 'clean up'] },
@@ -745,6 +1095,9 @@ function _wireAiCommandBox() {
       hideSuggestions();
     }
   });
+  const modelSelect = document.getElementById('ge-ai-command-model');
+  _populateQuickEditModels(modelSelect);
+  modelSelect?.addEventListener('change', () => _aiPlanner.setSelectedChoice(modelSelect.value));
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (busy) return;
@@ -758,88 +1111,43 @@ function _wireAiCommandBox() {
     const p = prompt.toLowerCase();
     setBusy(true);
     try {
-      if (/\brotate\b.*\b180\b|\bupside\s*down\b/.test(p)) {
-        _rotateAllLayers(180);
-        requestAnimationFrame(() => _setAiCommandStatus('Rotated 180.', 'done'));
+      // 1. Exact built-in commands run immediately, with or without a model.
+      const exact = _matchQuickEditCommand(p, prompt, { strict: true });
+      if (exact) {
+        await _runQuickEditActions(exact, runBtn);
         return;
       }
-      if (/\brotate\b.*\b(left|ccw|counter)\b|\bturn\s+left\b/.test(p)) {
-        _rotateAllLayers(270);
-        requestAnimationFrame(() => _setAiCommandStatus('Rotated left.', 'done'));
-        return;
-      }
-      if (/\brotate\b|\bturn\s+right\b|\bclockwise\b/.test(p)) {
-        _rotateAllLayers(90);
-        requestAnimationFrame(() => _setAiCommandStatus('Rotated 90.', 'done'));
-        return;
-      }
-      if (/\bflip\b.*\b(vertical|v)\b|\bmirror\b.*\b(vertical|v)\b/.test(p)) {
-        _flipAllLayers('v');
-        _setAiCommandStatus('Flipped vertical.', 'done');
-        return;
-      }
-      if (/\bflip\b|\bmirror\b/.test(p)) {
-        _flipAllLayers('h');
-        _setAiCommandStatus('Flipped horizontal.', 'done');
-        return;
-      }
-      if (/\b(remove|erase|cut\s*out|transparent)\b.*\b(bg|background)\b|\b(bg|background)\b.*\b(remove|erase|transparent)\b/.test(p)) {
-        _clickToolButton('rembg');
-        const target = _runExistingButton('ge-rembg-run', 'Removing background...');
-        if (!target) return;
-        await _waitForExistingButton(target);
-        _setAiCommandStatus('Background removal finished.', 'done');
-        return;
-      }
-      if (/\b(upscale|higher\s*res|increase\s*resolution|bigger|2x|4x)\b/.test(p)) {
-        _clickToolButton('upscale');
-        const target = _runExistingButton('ge-upscale-ai', 'Upscaling image...');
-        if (!target) return;
-        await _waitForExistingButton(target);
-        _setAiCommandStatus('Upscale finished.', 'done');
-        return;
-      }
-      if (/\b(denoise|noise|grain|grainy|clean\s*up)\b/.test(p)) {
-        _setAiCommandStatus('Denoising image...', 'running');
-        await _applyImageTool('/api/image/denoise', { strength: 0.55 }, 'Denoised', runBtn, { busyLabel: 'Denoising...' });
-        _setAiCommandStatus('Added denoised layer.', 'done');
-        return;
-      }
-      if (/\b(face|portrait|skin|selfie|restore)\b/.test(p)) {
-        _setAiCommandStatus('Enhancing face/portrait...', 'running');
-        await _applyImageTool('/api/image/enhance-face', {}, 'Enhanced Face', runBtn, { busyLabel: 'Enhancing...' });
-        _setAiCommandStatus('Added enhanced layer.', 'done');
-        return;
-      }
-      if (/\b(sharpen|sharp|crisp|clearer|make it look better|enhance|improve|better)\b/.test(p)) {
-        const amount = document.getElementById('ge-sharpen-amount');
-        if (amount) {
-          amount.value = '65';
-          amount.dispatchEvent(new Event('input', { bubbles: true }));
+      // 2. A configured language model plans the edit.
+      const choice = modelSelect && !modelSelect.hidden && modelSelect.value
+        ? (await _aiPlanner.getModelChoices()).find(c => c.value === modelSelect.value) || null
+        : null;
+      if (choice) {
+        _setAiCommandStatus(`Asking ${choice.model}…`, 'running');
+        const plan = await _aiPlanner.planEdit({
+          prompt,
+          choice,
+          context: _quickEditContext(),
+          preview: choice.vision ? _quickEditPreview() : null,
+        });
+        if (!plan.actions.length) {
+          _setAiCommandStatus(plan.message || 'No edit matched that request.', plan.message ? 'done' : 'error');
+          return;
         }
-        _clickToolButton('sharpen');
-        const target = _runExistingButton('ge-sharpen-run', 'Sharpening image...');
-        if (!target) return;
-        await _waitForExistingButton(target);
-        _setAiCommandStatus('Sharpen finished.', 'done');
+        await _runQuickEditActions(plan.actions, runBtn, { summary: plan.message });
         return;
       }
-
-      const stylePrompt = document.getElementById('ge-style-prompt');
-      const styleStrength = document.getElementById('ge-style-strength');
-      if (stylePrompt) stylePrompt.value = prompt;
-      if (styleStrength) {
-        styleStrength.value = /\b(subtle|slight|small)\b/.test(p) ? '35' : '55';
-        styleStrength.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-      _clickToolButton('style');
-      const target = _runExistingButton('ge-style-run', 'Running full-image AI edit...');
-      if (!target) return;
-      await _waitForExistingButton(target);
-      _setAiCommandStatus('Style edit finished.', 'done');
+      // 3. No model: upstream's keyword rules, ending in a style edit.
+      await _runQuickEditActions(_matchQuickEditCommand(p, prompt, { strict: false }), runBtn);
     } catch (err) {
       console.error('[ge-ai-command] failed', err);
       _setAiCommandStatus(err?.message || 'AI edit failed', 'error');
+      if (err?.helpTopic && uiModule) {
+        uiModule.showToast(err.message, {
+          duration: 8000,
+          action: 'How to enable',
+          onAction: () => host.showSetupHelp(err.helpTopic),
+        });
+      }
     } finally {
       setBusy(false);
     }
@@ -1915,16 +2223,14 @@ function _saveState(label) {
   try { _refreshHistoryPanelIfOpen(); } catch (e) { console.error('[gallery] refreshHistoryPanel:', e); }
 }
 
-// ────────── Persistent edit drafts (server-backed) ──────────
-// The previous implementation keyed drafts by gallery image-id in
-// localStorage; that meant blank-canvas sessions silently lost work and
-// drafts couldn't roam between devices. We now hold a server-side draft
-// row identified by a uuid (`state.draftId`) and PUT updates to it on a
-// debounced timer. `state.imageId` (gallery id) is still tracked separately
-// for "save back to the original photo" behaviour.
+// ────────── Persistent edit drafts (IndexedDB via host.drafts) ──────────
+// Each document is a draft row identified by a uuid (`state.draftId`) and
+// updated on a debounced timer. `state.imageId` (the recent-image id the
+// document was opened from) is tracked separately for "save back to the
+// original file" behaviour.
 const PERSIST_DEBOUNCE_MS = 800;
 const THUMB_MAX = 160;
-const ACTIVE_EDITOR_SESSION_KEY = 'odysseus-gallery-active-editor-v1';
+const ACTIVE_EDITOR_SESSION_KEY = 'odysseus-edit-active-editor-v1';
 
 // Keep just enough session metadata to reopen the editor after a browser
 // refresh. The actual layered document remains in the server-backed draft.
@@ -1962,6 +2268,30 @@ function _setDraftStatus(label, stateName = '') {
 
 function _clearActiveEditorSession() {
   try { sessionStorage.removeItem(ACTIVE_EDITOR_SESSION_KEY); } catch (_) {}
+}
+
+/** Session metadata written while a document is open, or null. */
+export function getActiveEditorSession() {
+  try {
+    const raw = sessionStorage.getItem(ACTIVE_EDITOR_SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/** Save the open document now instead of waiting for the debounce. */
+export async function flushDraft() {
+  // Bounded loop: wait out a save already running, then save once more if
+  // edits arrived meanwhile (persistDirty / a pending debounce timer).
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    if (!state.editorOpen || !state.layers.length) return;
+    if (state.persistInFlight) { await state.persistInFlight; continue; }
+    if (attempt > 0 && !state.persistTimer && !state.persistDirty) return;
+    if (state.persistTimer) { clearTimeout(state.persistTimer); state.persistTimer = null; }
+    state.persistDirty = false;
+    await _persistDraft();
+  }
 }
 
 function _schedulePersist() {
@@ -2188,44 +2518,15 @@ async function _persistDraft() {
       }
       return;
     }
-    const responseError = async (res, method) => {
-      let detail = '';
-      try { detail = (await res.json())?.detail || ''; } catch {}
-      const error = new Error(detail || `${method} failed: ${res.status}`);
-      error.status = res.status;
-      return error;
-    };
-    const doRequest = async () => {
-      if (draftIdAtStart) {
-        const res = await fetch(`/api/editor-drafts/${encodeURIComponent(draftIdAtStart)}`, {
-          method: 'PUT', credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: serializedBody,
-        });
-        // 404 means our row was deleted while editing — fall through to
-        // create a fresh one so the user doesn't lose work.
-        if (res.status === 404) {
-          return fetch('/api/editor-drafts', {
-            method: 'POST', credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: serializedBody,
-          }).then(async created => {
-            if (!created.ok) throw await responseError(created, 'POST');
-            return created.json();
-          });
-        }
-        if (!res.ok) throw await responseError(res, 'PUT');
-        return res.json();
-      }
-      const res = await fetch('/api/editor-drafts', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: serializedBody,
-      });
-      if (!res.ok) throw await responseError(res, 'POST');
-      return res.json();
-    };
-    return doRequest();
+    // Drafts live in IndexedDB. Saving under an id that was deleted while
+    // editing simply recreates the row, so work is never dropped.
+    try {
+      return await host.drafts.save(draftIdAtStart, body);
+    } catch (err) {
+      // Quota errors are the IndexedDB equivalent of upstream's HTTP 413.
+      if (err?.name === 'QuotaExceededError') err.status = 413;
+      throw err;
+    }
   };
   const savePromise = doSave();
   state.persistInFlight = savePromise
@@ -2259,11 +2560,7 @@ async function _persistDraft() {
 async function _loadDraftById(draftId) {
   if (!draftId) return null;
   try {
-    const res = await fetch(`/api/editor-drafts/${encodeURIComponent(draftId)}`, {
-      credentials: 'same-origin',
-    });
-    if (!res.ok) return null;
-    const out = await res.json();
+    const out = await host.drafts.get(draftId);
     if (!out || !out.payload || !Array.isArray(out.payload.layers)) return null;
     return out;
   } catch (_) {
@@ -2274,12 +2571,9 @@ async function _loadDraftById(draftId) {
 async function _findDraftForImage(imageId) {
   if (!imageId) return null;
   try {
-    const res = await fetch('/api/editor-drafts', { credentials: 'same-origin' });
-    if (!res.ok) return null;
-    const out = await res.json();
-    const match = (out.drafts || []).find(d => d.source_image_id === imageId);
-    if (!match) return null;
-    return _loadDraftById(match.id);
+    const out = await host.drafts.findBySource(imageId);
+    if (!out || !out.payload || !Array.isArray(out.payload.layers)) return null;
+    return out;
   } catch (_) {
     return null;
   }
@@ -2288,9 +2582,7 @@ async function _findDraftForImage(imageId) {
 async function _clearDraftServer(draftId) {
   if (!draftId) return;
   try {
-    await fetch(`/api/editor-drafts/${encodeURIComponent(draftId)}`, {
-      method: 'DELETE', credentials: 'same-origin',
-    });
+    await host.drafts.remove(draftId);
   } catch (_) { /* best-effort */ }
 }
 
@@ -6230,52 +6522,42 @@ function _buildEditor(container) {
     const endBusy = _saveButtonBusy('Saving…');
     let blob = null;
     let savedOk = false;
+    let cancelled = false;
     const t0 = performance.now();
     try {
       // Encode directly from the flattened canvas via toBlob() to avoid
-      // the dataURL round-trip (which doubles peak memory). Pick JPEG for
-      // photo sources so 24MP uploads don't balloon to 200MB+ PNG —
-      // critical when the editor is accessed over Tailscale Funnel etc.
-      const flat = flatten();
-      const ext = (state.originalExt || 'png').toLowerCase();
-      const isJpeg = ext === 'jpg' || ext === 'jpeg';
-      const mime = isJpeg ? 'image/jpeg' : 'image/png';
-      const quality = isJpeg ? 0.92 : undefined;
-      blob = await new Promise((resolve, reject) => {
-        flat.toBlob(b => b ? resolve(b) : reject(new Error('Canvas encode failed')), mime, quality);
+      // the dataURL round-trip (which doubles peak memory). The host picks
+      // the format of the opened file, so a JPEG photo stays a JPEG.
+      const encode = (mime, quality) => new Promise((resolve, reject) => {
+        flatten().toBlob(b => b ? resolve(b) : reject(new Error('Canvas encode failed')), mime, quality);
       });
-      const fd = new FormData();
-      fd.append('image', blob, `edited.${isJpeg ? 'jpg' : 'png'}`);
-      const resp = await fetch(`${API_BASE}/api/gallery/${state.imageId}/replace`, {
-        method: 'POST',
-        credentials: 'same-origin',
-        body: fd,
+      const result = await host.saveOverOriginal({
+        imageId: state.imageId,
+        fallbackName: _defaultExportName(),
+        encode,
       });
-      if (!resp.ok) {
-        let detail = '';
-        try { const j = await resp.json(); detail = j.detail || j.error || ''; } catch {}
-        throw new Error(`HTTP ${resp.status}${detail ? `: ${detail}` : ''}`);
+      blob = result.blob;
+      if (result.mode === 'cancelled') {
+        cancelled = true;
+      } else {
+        const totalMs = Math.round(performance.now() - t0);
+        const size = blob ? `${_formatBytes(blob.size)} · ` : '';
+        const verb = result.mode === 'overwritten' ? `Saved over ${result.name}`
+          : result.mode === 'downloaded' ? `Downloaded ${result.name}`
+          : `Saved ${result.name}`;
+        if (uiModule) uiModule.showToast(`${verb} (${size}${(totalMs / 1000).toFixed(1)}s)`, 4000);
+        savedOk = true;
       }
-      const totalMs = Math.round(performance.now() - t0);
-      if (uiModule) uiModule.showToast(`Saved over original (${(blob.size / 1024 / 1024).toFixed(1)}MB · ${(totalMs / 1000).toFixed(1)}s)`, 4000);
-      window.dispatchEvent(new CustomEvent('gallery-refresh'));
-      savedOk = true;
     } catch (e) {
       console.error('[save] error:', e);
       const sizeMB = blob ? ` (${(blob.size / 1024 / 1024).toFixed(1)}MB)` : '';
-      let msg = e?.message || 'unknown';
-      if (e?.name === 'TypeError' || /fetch|network|load failed/i.test(msg)) {
-        msg = `network dropped${sizeMB} — try "Save as copy" or check connection`;
-      } else {
-        msg += sizeMB;
-      }
-      if (uiModule) uiModule.showToast('Failed to save: ' + msg, 6000);
+      if (uiModule) uiModule.showToast('Failed to save: ' + (e?.message || 'unknown') + sizeMB, 6000);
     } finally {
       endBusy();
       if (savedOk) {
         _setDraftStatus('Saved', 'saved');
         _flashSaveButtonOk();
-      } else {
+      } else if (!cancelled) {
         _setDraftStatus('Save failed', 'error');
       }
     }
@@ -6391,7 +6673,7 @@ function _buildEditor(container) {
 
   // Harmonize / Canvas Upscale / AI Upscale / Style Transfer +
   // Add-Empty-Layer — full implementation in editor/ai-tools-misc.js.
-  const { addEmptyLayer: _addEmptyLayer } = wireAIToolsMisc({
+  const { addEmptyLayer: _addEmptyLayer, runAiUpscale } = wireAIToolsMisc({
     apiBase: API_BASE,
     buildLayerBodyMask: _buildLayerBodyMask,
     buildSeamMask: _buildSeamMask,
@@ -6406,6 +6688,7 @@ function _buildEditor(container) {
     uiModule,
     openAdjustmentLayer: (type, anchor) => _addAdjustmentLayer(type, anchor),
   });
+  _runAiUpscale = runAiUpscale;
   // (Merge dropdown removed — Merge Down / Merge All / Flatten Copy
   // are now three inline icon buttons in the layers header next to
   // + Add. Their individual click handlers below already bind by id.)
@@ -6762,6 +7045,13 @@ function _saveButtonBusy(label) {
   };
 }
 
+function _formatBytes(bytes) {
+  const n = Number(bytes) || 0;
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
 function _defaultExportName() {
   return String(state.draftName || 'edited-image')
     .replace(/×/g, 'x')
@@ -6779,108 +7069,46 @@ export async function exportToGallery() {
   const settings = await _openExportDialog({
     sourceCanvas: flat,
     defaultName: _defaultExportName(),
-    title: 'Save Copy',
-    submitLabel: 'Save Copy',
+    title: 'Save As',
+    submitLabel: 'Save',
     attachColorPicker,
     returnFocus: document.getElementById('ge-save-menu-btn'),
   });
   if (!settings) return;
-  const endBusy = _saveButtonBusy('Saving copy…');
+  const endBusy = _saveButtonBusy('Saving…');
   try {
-    const encoded = await _encodeExportCanvas(flat, settings);
-    blob = encoded.blob;
-    const formData = new FormData();
-    formData.append('file', blob, `${settings.filename}.${encoded.extension}`);
-
-    const saveRes = await fetch(`${API_BASE}/api/gallery/upload`, {
-      method: 'POST',
-      credentials: 'same-origin',
-      body: formData,
+    // The draft stays: unlike a gallery upload, a file on disk does not
+    // keep the layers, so the user can keep editing from the draft.
+    const result = await host.saveCopy({
+      filename: settings.filename,
+      format: settings.format,
+      encode: async () => (await _encodeExportCanvas(flat, settings)).blob,
     });
-    if (!saveRes.ok) {
-      const errBody = await saveRes.text().catch(() => '');
-      throw new Error(`HTTP ${saveRes.status}: ${errBody.substring(0, 120)}`);
-    }
-    const totalMs = Math.round(performance.now() - t0);
-    window.dispatchEvent(new CustomEvent('gallery-refresh'));
-    if (uiModule) uiModule.showToast(`Saved copy to gallery (${(blob.size / 1024 / 1024).toFixed(1)}MB · ${(totalMs / 1000).toFixed(1)}s)`, 4000);
-    savedOk = true;
-    if (state.draftId) {
-      _clearDraftServer(state.draftId);
-      state.draftId = null;
+    blob = result.blob;
+    if (result.mode !== 'cancelled') {
+      const totalMs = Math.round(performance.now() - t0);
+      const verb = result.mode === 'downloaded' ? 'Downloaded' : 'Saved';
+      if (uiModule) uiModule.showToast(`${verb} ${result.name} (${_formatBytes(blob.size)} · ${(totalMs / 1000).toFixed(1)}s)`, 4000);
+      savedOk = true;
     }
   } catch (e) {
-    console.error('[save-as-copy] error:', e);
+    console.error('[save-as] error:', e);
     const sizeMB = blob ? ` (${(blob.size / 1024 / 1024).toFixed(1)}MB)` : '';
-    let msg = e?.message || 'unknown';
-    if (e?.name === 'TypeError' || /fetch|network|load failed/i.test(msg)) {
-      msg = `network dropped${sizeMB} — check connection`;
-    } else {
-      msg += sizeMB;
-    }
-    if (uiModule) uiModule.showToast('Save failed: ' + msg, 6000);
+    if (uiModule) uiModule.showToast('Save failed: ' + (e?.message || 'unknown') + sizeMB, 6000);
   } finally {
     endBusy();
     if (savedOk) _flashSaveButtonOk();
   }
 }
 
-// Open the Cookbook modal scoped to img2img-capable models so the user
-// can serve one in a few clicks. Falls back to plain Cookbook if the
-// filter hook isn't available.
-// Open Cookbook on its Dependencies tab and highlight a specific
-// package row. Used for "rembg not installed" → install path.
+// Upstream opened Odysseus Cookbook here to install packages or serve an
+// image model. Odysseus-Edit explains how to enable the feature instead.
 function _openCookbookForDependency(pkgName) {
-  // Use cookbookModule.open({ tab: 'Dependencies' }) so the intent is
-  // honored after Cookbook's async render. The old path clicked the
-  // sidebar button + polled for the modal, but Cookbook's _renderRecipes
-  // runs AFTER an awaited _syncFromServer, so depsTab.click() often
-  // raced and the user landed on Download.
-  const cookbook = window.cookbookModule;
-  if (!cookbook || typeof cookbook.open !== 'function') {
-    // Fall back to the old click-then-poll path if the module isn't
-    // on window for some reason.
-    const btn = document.getElementById('tool-cookbook-btn');
-    if (btn) btn.click();
-    else if (uiModule) uiModule.showToast(`Open Cookbook to install ${pkgName}`, 6000);
-    return;
-  }
-  cookbook.open({ tab: 'Dependencies' });
-  // Now wait for the Dependencies group to render, switch the server
-  // selector to Local, and highlight the package row.
-  const cb = document.getElementById('cookbook-modal');
-  if (cb) cb.style.zIndex = 260;
-  const tryServer = (attempt = 0) => {
-    const serverSel = document.getElementById('hwfit-deps-server');
-    if (!serverSel) {
-      if (attempt < 25) return setTimeout(() => tryServer(attempt + 1), 80);
-      return;
-    }
-    if (serverSel.value !== 'local') {
-      serverSel.value = 'local';
-      serverSel.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-  };
-  tryServer();
-  const tryHighlight = (a2 = 0) => {
-    const rows = document.querySelectorAll('[data-pkg-name]');
-    if (!rows.length) {
-      if (a2 < 40) return setTimeout(() => tryHighlight(a2 + 1), 100);
-      return;
-    }
-    const row = Array.from(rows).find(r => (r.dataset.pkgName || '').toLowerCase() === pkgName.toLowerCase());
-    if (row) {
-      row.scrollIntoView({ block: 'center' });
-      row.classList.add('cookbook-pkg-flash');
-      setTimeout(() => row.classList.remove('cookbook-pkg-flash'), 2000);
-    }
-  };
-  tryHighlight();
+  host.showSetupHelp(String(pkgName || '').toLowerCase() === 'rembg' ? 'rembg' : 'server');
 }
 
-// Async check whether `rembg` is installed on the Odysseus server.
-// Toggles the "install rembg" notice + the Bg Remove run button. The
-// `/api/cookbook/packages` endpoint is cheap (importlib calls only).
+// Toggles the "install rembg" notice + the Bg Remove run button from the
+// server's /api/capabilities (null when the AI server is not running).
 async function _checkRembgInstalled() {
   const noticeEl = document.getElementById('ge-rembg-dep-missing');
   const runRow = document.getElementById('ge-rembg-run-row');
@@ -6891,15 +7119,8 @@ async function _checkRembgInstalled() {
     runRow.style.display = state.rembgInstalledCache ? '' : 'none';
     return;
   }
-  try {
-    const r = await fetch('/api/cookbook/packages', { credentials: 'same-origin' });
-    if (!r.ok) throw new Error('packages query failed');
-    const data = await r.json();
-    const pkg = (data.packages || []).find(p => (p.name || '').toLowerCase() === 'rembg');
-    state.rembgInstalledCache = pkg ? !!pkg.installed : null;
-  } catch (e) {
-    state.rembgInstalledCache = null; // unknown — fall back to silent
-  }
+  const caps = await host.getCapabilities();
+  state.rembgInstalledCache = caps ? !!caps.local_tools?.remove_bg : false;
   if (state.rembgInstalledCache === false) {
     noticeEl.style.display = '';
     runRow.style.display = 'none';
@@ -6910,47 +7131,7 @@ async function _checkRembgInstalled() {
 }
 
 function _openCookbookForImg2img() {
-  // Try multiple openers in order — the sidebar button may be hidden on
-  // mobile so we fall back to the rail button, then to modalManager.
-  let opened = false;
-  const btn = document.getElementById('tool-cookbook-btn');
-  const railBtn = document.getElementById('rail-cookbook');
-  if (btn && btn.offsetParent !== null) { btn.click(); opened = true; }
-  else if (railBtn) { railBtn.click(); opened = true; }
-  else { try { modalManager.restore('cookbook-modal'); opened = true; } catch {} }
-  if (opened) {
-    // Two-stage navigation: 1) wait for modal mount, 2) click Serve tab,
-    // 3) after the serve tag chips render, click the "image" one.
-    const tryServe = (attempt = 0) => {
-      const cb = document.getElementById('cookbook-modal');
-      const serveTab = cb ? cb.querySelector('.cookbook-tab[data-backend="Serve"]') : null;
-      // Retry until BOTH the modal mounts AND its tab bar has rendered.
-      // Cookbook builds its body html after the modal opens, so we need
-      // to wait a bit longer than just "modal exists".
-      if (!cb || !serveTab) {
-        if (attempt < 40) return setTimeout(() => tryServe(attempt + 1), 80);
-        return;
-      }
-      cb.style.zIndex = 260;
-      serveTab.click();
-      // Now wait for the serve-tags container to populate (it lazy-loads
-      // after the cached-models fetch resolves) and click the image chip.
-      const tryImageFilter = (a2 = 0) => {
-        const tags = document.getElementById('serve-tags');
-        if (!tags || !tags.querySelector('.memory-cat-chip')) {
-          if (a2 < 20) return setTimeout(() => tryImageFilter(a2 + 1), 100);
-          return;
-        }
-        const imgChip = Array.from(tags.querySelectorAll('.memory-cat-chip'))
-          .find(c => /^image$/i.test(c.dataset.serveTag || '') || /image/i.test(c.textContent || ''));
-        if (imgChip) imgChip.click();
-      };
-      tryImageFilter();
-    };
-    tryServe();
-    return;
-  }
-  if (uiModule) uiModule.showToast('Open Cookbook from the sidebar to serve an img2img model', 6000);
+  host.showSetupHelp('image-model');
 }
 
 export async function downloadPNG() {
@@ -6970,7 +7151,7 @@ export async function downloadPNG() {
     a.download = `${settings.filename}.${extension}`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    if (uiModule) uiModule.showToast(`Exported ${(blob.size / 1024 / 1024).toFixed(1)} MB`);
+    if (uiModule) uiModule.showToast(`Exported ${a.download} (${_formatBytes(blob.size)})`, 3000);
   } catch (error) {
     console.error('[image-export] error:', error);
     if (uiModule) uiModule.showToast('Export failed: ' + (error?.message || 'unknown error'), 5000);
@@ -7591,9 +7772,9 @@ export function closeEditor(options = {}) {
   if (_textEditor?.isOpen()) _textEditor.close(true);
   // Flush any pending debounced persist + fire one final save so closing
   // the editor mid-stroke doesn't lose work. The call is fire-and-forget;
-  // the server commit lands shortly after the modal hides.
+  // callers that already awaited flushDraft() pass {persist: false}.
   if (state.persistTimer) { clearTimeout(state.persistTimer); state.persistTimer = null; }
-  if (state.layers.length) {
+  if (state.layers.length && options.persist !== false) {
     try { _persistDraft(); } catch {}
   }
   // Invalidate asynchronous encoding/network callbacks before tearing down
@@ -7710,6 +7891,8 @@ export function isEditorOpen() {
 const galleryEditorModule = {
   openEditor,
   closeEditor,
+  flushDraft,
+  getActiveEditorSession,
   isEditorOpen,
   exportPNG,
   exportToGallery,

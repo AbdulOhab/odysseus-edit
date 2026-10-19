@@ -23,6 +23,8 @@
  *   apiBase:                string,
  *   openCookbookForImg2img: () => void,
  * }} deps
+ *
+ * Modified for Odysseus-Edit (2026-10-19): model picker setup label instead of Odysseus Cookbook. See NOTICE.md.
  */
 import { state } from './state.js';
 import { sortModelIds } from '../modelSort.js';
@@ -182,7 +184,7 @@ export function wireAIModelSelectors({ container, apiBase, openCookbookForImg2im
         sel.appendChild(sep);
         const serveOpt = document.createElement('option');
         serveOpt.value = '__serve_cookbook__';
-        serveOpt.textContent = '+ Serve a model in Cookbook…';
+        serveOpt.textContent = '+ Set up image models…';
         sel.appendChild(serveOpt);
       };
       for (const ts of perToolSelects) appendServeSentinel(ts);
@@ -227,7 +229,7 @@ export function wireAIModelSelectors({ container, apiBase, openCookbookForImg2im
       // Fetch failed — still give the user the affordance to set up
       // a model. Otherwise the dropdown shows only "Auto" with no
       // hint about what to do next.
-      const fallback = '<option value="">Auto</option><option disabled>Could not load image models</option><option value="__serve_cookbook__">+ Serve a model in Cookbook…</option>';
+      const fallback = '<option value="">Auto</option><option disabled>Could not load image models</option><option value="__serve_cookbook__">+ Set up image models…</option>';
       if (aiGenSelect) aiGenSelect.innerHTML = fallback;
       if (aiInpaintSelect) aiInpaintSelect.innerHTML = fallback;
       document.querySelectorAll('select.ge-tool-model').forEach(ts => { ts.innerHTML = fallback; });

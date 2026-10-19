@@ -7,13 +7,18 @@
  * baked into the markup.
  *
  * @returns {HTMLDivElement}
+ *
+ * Modified for Odysseus-Edit (2026-10-19): Home button instead of the ALPHA badge; Save labels for files on disk. See NOTICE.md.
  */
 export function buildTopbar() {
   const topBar = document.createElement('div');
   topBar.className = 'ge-topbar';
   topBar.innerHTML = `
     <div class="ge-topbar-left">
-      <span class="ge-alpha-badge" title="This editor is in active development — expect rough edges">ALPHA</span>
+      <button class="ge-btn ge-btn-sm ge-stacked-btn oe-home-btn" id="oe-home-btn" title="Back to start (your work is kept as a draft)" aria-label="Home">
+        <span class="ge-stacked-glyph"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 3l9 8"/><path d="M5 10v10h14V10"/></svg></span>
+        <span class="ge-stacked-label">HOME</span>
+      </button>
       <button class="ge-btn ge-btn-sm ge-stacked-btn" id="ge-undo" title="Undo">
         <span class="ge-stacked-glyph">↩</span>
         <span class="ge-stacked-label">UNDO</span>
@@ -165,14 +170,14 @@ export function buildTopbar() {
         </button>
         <div class="ge-save-menu dropdown" id="ge-save-menu" hidden>
           <div class="dropdown-section-label">Image</div>
-          <button class="dropdown-item-compact" id="ge-save" title="Overwrite the original image">
+          <button class="dropdown-item-compact" id="ge-save" title="Overwrite the opened file, or save a new file">
             <span class="dropdown-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></span>
-            <span>Save over original</span>
+            <span>Save</span>
             <span class="dropdown-shortcut">Ctrl+S</span>
           </button>
-          <button class="dropdown-item-compact" id="ge-export-gallery" title="Save as a new image in the gallery">
+          <button class="dropdown-item-compact" id="ge-export-gallery" title="Save a copy as a new file">
             <span class="dropdown-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg></span>
-            <span>Save as copy</span>
+            <span>Save as…</span>
             <span class="dropdown-shortcut">Ctrl+Shift+S</span>
           </button>
           <button class="dropdown-item-compact" id="ge-download" title="Export an image to your computer">

@@ -31,6 +31,8 @@
  * }} deps
  *
  * @returns {(endpoint: string, extraPayload: object, layerName: string, btn: HTMLButtonElement, opts?: { busyLabel?: string }) => Promise<void>}
+ *
+ * Modified for Odysseus-Edit (2026-10-19): setup action label instead of Odysseus Cookbook. See NOTICE.md.
  */
 import { state } from './state.js';
 import { beginAIOperation, decodeAIImage } from './ai-operation.js';
@@ -131,7 +133,7 @@ export function createApplyImageTool({
         } else if (needsImg2Img && uiModule.showToast.length >= 2) {
           uiModule.showToast(layerName + ' failed: ' + e.message, {
             duration: 9000,
-            action: 'Open Cookbook',
+            action: 'Set up image model',
             onAction: () => openCookbookForImg2img(),
           });
         } else {
