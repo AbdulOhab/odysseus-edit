@@ -6,7 +6,11 @@ is kept but `.sidebar .active` is not). Selectors with no class or id are kept
 only when they come from a file listed in --whole. @media/@supports blocks are
 filtered recursively; @keyframes are kept when a kept rule names them.
 
-usage: extract_css.py --js DIR [--js DIR...] --whole FILE... --out OUT CSS...
+--deny NAME...         never keep selectors using these class/id names
+--drop-selector SEL... remove these exact selectors from any rule (whitespace
+                       normalised), e.g. a global rule that fights the editor
+
+usage: extract_css.py --js DIR [--js DIR...] [--deny NAME...] [--drop-selector SEL...] --out OUT CSS...
 """
 import argparse
 import pathlib
@@ -105,6 +109,7 @@ def main():
     ap.add_argument("--js", action="append", required=True)
     ap.add_argument("--whole", nargs="*", default=[])
     ap.add_argument("--deny", nargs="*", default=[])
+    ap.add_argument("--drop-selector", nargs="*", default=[])
     ap.add_argument("--out", required=True)
     ap.add_argument("css", nargs="+")
     a = ap.parse_args()
@@ -116,6 +121,7 @@ def main():
                 tokens.update(TOKEN_RE.findall(p.read_text(encoding="utf-8", errors="replace")))
     whole = {pathlib.Path(w).name for w in a.whole}
     deny = set(a.deny)
+    drop = {" ".join(d.split()) for d in a.drop_selector}
 
     out_parts = []
     keyframes = {}
@@ -126,6 +132,8 @@ def main():
         sels = split_selectors(prelude)
         kept = []
         for s in sels:
+            if " ".join(s.split()) in drop:
+                continue
             names = selector_names(s)
             if not names:
                 if fname in whole:

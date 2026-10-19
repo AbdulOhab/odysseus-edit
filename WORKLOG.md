@@ -2,6 +2,28 @@
 
 Newest entry first. Each entry: what changed, how it was verified, what is left.
 
+## 2026-10-19 (night): Quick Edit look and replies
+
+**Done** (from the user's screenshots: "no need for toasts, the design broke")
+- Removed the Quick Edit toasts; errors stay in the status line, with an
+  inline "How to enable" link when the AI server is missing.
+- Light theme: Odysseus' `:root.light button` rule turned the send and Save
+  buttons grey and boxed the icon buttons. The CSS sync now drops that
+  selector (`tools/extract_css.py --drop-selector`), and the landing-page
+  workaround for it is gone.
+- Model picker sits after "DOCUMENT" with the same divider and reads as a
+  label, so its caret no longer sits next to the collapse chevron.
+- Planner prompt lists the manual tools; for "remove the cuts at the bottom"
+  GLM now answers (in Bengali) to use Healing Brush or Clone Stamp.
+
+**Verified**
+- Light and dark screenshots of Quick Edit and the top bar: red send/Save
+  buttons, transparent icon buttons. 155 server tests pass, ruff clean.
+- One real glm-5.3 call with the user's prompt: guidance reply, HTTP 200.
+
+**Left**
+- The user restarts their server to pick up the planner prompt change.
+
 ## 2026-10-19 (evening): "glm-5.3-flash does nothing"
 
 **Found**

@@ -421,26 +421,40 @@ body.oe-body:not(.oe-editing) { height: auto; min-height: 100dvh; overflow: visi
 /* AI tools need the optional server; hide them when it is not running. */
 :root.oe-ai-offline .ge-tool-btn.is-ai { display: none !important; }
 
-.ge-ai-command-model {
-  max-width: 180px;
-  margin-left: auto;
-  font: 11px var(--oe-font);
+/* Quick Edit model picker: sits after the "DOCUMENT" label with the same
+   divider, so its caret is not next to the collapse chevron. `html:root`
+   matches upstream's `:root.light select` (0,2,1). */
+html:root .ge-ai-command-model {
+  max-width: 170px;
+  height: 18px;
+  margin-left: 7px;
+  padding: 0 2px 0 7px;
+  border: 0;
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
   color: var(--fg);
-  background: var(--bg);
-  border: 1px solid var(--oe-faint);
-  border-radius: 6px;
-  padding: 2px 6px;
+  opacity: 0.75;
+  font: 600 10px var(--oe-font);
+  text-overflow: ellipsis;
+  cursor: pointer;
 }
+html:root .ge-ai-command-model:hover,
+html:root .ge-ai-command-model:focus-visible {
+  opacity: 1;
+  color: var(--accent, var(--red));
+  outline: none;
+}
+.ge-ai-command-model option { background: var(--panel); color: var(--fg); }
 .ge-ai-command-model[hidden] { display: none; }
-.ge-ai-command-model + .ge-ai-command-close { margin-left: 6px; }
 
-/* Upstream's light theme paints every button grey with
-   `:root.light button` (specificity 0,2,1). The editor keeps that look; the
-   shell's own buttons match the specificity and win by coming later. */
-html:root .oe-btn { background: var(--panel); }
-html:root .oe-btn-primary { background: var(--oe-accent); }
-html:root .oe-btn-danger { background: var(--color-danger); }
-html:root :is(.oe-status, .oe-icon-btn, .oe-preset, .oe-draft-open, .oe-toast-action, .oe-dock-restore, .oe-dock-close) {
+.ge-ai-command-status-action {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
   background: none;
+  color: var(--accent, var(--red));
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
 }
-html:root .oe-draft-delete { background: color-mix(in srgb, var(--panel) 85%, transparent); }

@@ -493,11 +493,20 @@ const _applyImageTool = createApplyImageTool({
   uiModule,
 });
 
-function _setAiCommandStatus(text, kind = '') {
+function _setAiCommandStatus(text, kind = '', action = null) {
   const el = document.getElementById('ge-ai-command-status');
   if (!el) return;
   el.textContent = text || '';
   el.dataset.kind = kind || '';
+  // Odysseus-Edit: optional inline action (e.g. "How to enable").
+  if (action?.label && typeof action.onClick === 'function') {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ge-ai-command-status-action';
+    btn.textContent = action.label;
+    btn.addEventListener('click', action.onClick);
+    el.appendChild(btn);
+  }
 }
 
 function _escapeAiCommandText(value) {
@@ -986,12 +995,9 @@ function _wireAiCommandBox() {
           preview: choice.vision ? _quickEditPreview() : null,
         });
         if (!plan.actions.length) {
-          // The model answered but planned nothing (a question, or an edit
-          // this install cannot do). Say so loudly: the status line is easy
-          // to miss.
-          const reply = plan.message || 'The model did not suggest any edit for that request.';
-          _setAiCommandStatus(reply, 'error');
-          if (uiModule) uiModule.showToast(`${choice.model}: ${reply}`, 7000);
+          // The model answered without an edit: a question, advice on which
+          // tool to use, or something this install cannot do.
+          _setAiCommandStatus(plan.message || 'The model did not suggest any edit for that request.', '');
           return;
         }
         await _runQuickEditActions(plan.actions, runBtn, { summary: plan.message });
@@ -1001,17 +1007,9 @@ function _wireAiCommandBox() {
       await _runQuickEditActions(matchQuickEditCommand(p, prompt, { strict: false }), runBtn);
     } catch (err) {
       console.error('[ge-ai-command] failed', err);
-      const message = err?.message || 'AI edit failed';
-      _setAiCommandStatus(message, 'error');
-      if (uiModule && err?.helpTopic) {
-        uiModule.showToast(message, {
-          duration: 8000,
-          action: 'How to enable',
-          onAction: () => host.showSetupHelp(err.helpTopic),
-        });
-      } else if (uiModule) {
-        uiModule.showToast(message, { duration: 8000, error: true });
-      }
+      _setAiCommandStatus(err?.message || 'AI edit failed', 'error', err?.helpTopic
+        ? { label: 'How to enable', onClick: () => host.showSetupHelp(err.helpTopic) }
+        : null);
     } finally {
       setBusy(false);
     }

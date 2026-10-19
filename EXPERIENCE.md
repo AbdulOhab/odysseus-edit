@@ -30,10 +30,13 @@ changing code; add to it when something costs you time. Group by area.
   selectors appears in the editor's JS. That over-includes app areas whose
   names collide with JS identifiers (`msg`, `section`, `sidebar`), hence the
   `--deny` list in `tools/sync-upstream-css.sh`.
-- **`:root.light button { background: #eaeaea }`** (specificity 0,2,1) comes
-  along and greys every button in light mode. The editor keeps that look for
-  fidelity; shell buttons in `app/app.css` use `html:root .oe-…` (also 0,2,1,
-  later in the cascade) to win.
+- **`:root.light button { background: #eaeaea }`** (specificity 0,2,1, from
+  Odysseus' chat CSS) beat every editor button colour in light mode: grey Save
+  and Quick Edit send buttons, grey boxes behind icon buttons. The editor's
+  buttons already set their own backgrounds from theme tokens, so
+  `tools/sync-upstream-css.sh` drops that one selector (`--drop-selector`).
+  Inputs and selects keep the grey; restyle a select with `html:root .x`
+  (also 0,2,1, later in the cascade).
 - `--accent`, `--fg-muted` and `--bg-secondary` are never defined upstream
   either; the editor falls back or inherits. Do not define them globally or the
   editor's look changes.
@@ -128,8 +131,12 @@ changing code; add to it when something costs you time. Group by area.
   gets HTTP 429 `[1302] Rate limit reached for requests`. `llm._post` retries
   429/503/529 twice (2 s, 5 s, or Retry-After). Don't hammer a user's key
   while debugging; one request at a time. A real call takes 5-10 s.
-- **"It does nothing" usually means the result was easy to miss.** Planner
-  errors and empty plans now raise a toast, not only the small status line.
+- **"It does nothing" usually means the result was easy to miss.** The user
+  did not want toasts for this; Quick Edit reports in its status line (errors
+  red, model replies without an edit in normal text, "How to enable" inline).
   Adjustments on a blank white canvas also look like nothing happened.
+- The model only knew the AI actions, so for "remove the scratches" it said
+  the editor cannot. The system prompt now lists the manual tools (Healing,
+  Clone, Crop, ...) and asks the model to tell the user which one to use.
 - For end-to-end tests without a real key, a 40-line mock of `/v1/messages`
   (Anthropic format) is enough; point a provider's `base_url` at it.

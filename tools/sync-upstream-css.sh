@@ -14,13 +14,17 @@ DENY=(sidebar msg research-overlay cookbook-modal tool-cookbook-btn rail-cookboo
       serve-tags editing tour-hint tour-hint-dismiss section grow thumb toggle)
 PRE=(01-agent-chat 02-compare 03-agent-chat 04-memory 05-documents 06-admin-settings
      07-documents 08-skills 09-gallery 10-cookbook 11-tasks 12-gallery)
+# Odysseus' light theme greys every <button> with `:root.light button`
+# (specificity 0,2,1), which beats the editor's own button colours: the Save
+# and Quick Edit send buttons turn grey, icon buttons get grey boxes.
+DROP=(":root.light button")
 POST=(14-email 15-notes 16-calendar 17-research documents-gallery-editor
       email-calendar-notes-tasks cookbook-research-memory-settings)
 run() {
   local out="$1"; shift
   local files=()
   for f in "$@"; do files+=("$CSS/$f.css"); done
-  python3 -I "$ROOT/tools/extract_css.py" --js "$ROOT/web/js" --deny "${DENY[@]}" --out "$out" "${files[@]}"
+  python3 -I "$ROOT/tools/extract_css.py" --js "$ROOT/web/js" --deny "${DENY[@]}" --drop-selector "${DROP[@]}" --out "$out" "${files[@]}"
 }
 run "$ROOT/web/css/upstream-pre.css" "${PRE[@]}"
 run "$ROOT/web/css/upstream-post.css" "${POST[@]}"

@@ -324,3 +324,9 @@ def test_validate_plan_caps_action_count():
     raw = {"actions": [{"type": "vibrance", "amount": i} for i in range(20)]}
     _, actions, _ = planner.validate_plan(raw, allowed_ai=[])
     assert len(actions) == planner.MAX_ACTIONS
+
+
+def test_system_prompt_mentions_manual_tools():
+    prompt = planner.build_system_prompt([])
+    assert "Healing brush" in prompt and "Clone stamp" in prompt
+    assert "which manual tool to use" in prompt

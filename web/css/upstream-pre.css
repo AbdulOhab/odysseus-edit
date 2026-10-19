@@ -20,7 +20,6 @@
 }
 :root.light input,
 :root.light textarea,
-:root.light button,
 :root.light select {
       background:#eaeaea;
       color-scheme: light;
