@@ -109,8 +109,11 @@ cd server && uv run pytest     # server tests
 - `web/js/` mirrors upstream `odysseus/static/js/`; `web/app/` is new code.
   The editor reaches storage, files and the server only through
   `web/app/host.js`.
-- `tools/sync-upstream-css.sh /path/to/odysseus` regenerates the CSS taken
-  from Odysseus' app stylesheets.
+- **Updating from Odysseus:** `python3 tools/upstream-sync.py /path/to/odysseus`
+  merges upstream changes through the `upstream` vendor branch. The full
+  procedure, written for coding agents, is in
+  [docs/UPSTREAM-SYNC.md](docs/UPSTREAM-SYNC.md). When pushing, push both
+  branches: `git push origin main upstream`.
 - [CLAUDE.md](CLAUDE.md) has notes for coding agents, [EXPERIENCE.md](EXPERIENCE.md)
   records lessons learned, [WORKLOG.md](WORKLOG.md) records each session.
 

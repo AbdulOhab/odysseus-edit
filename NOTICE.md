@@ -14,8 +14,10 @@ or endorsed by the Odysseus project.
 | Commit | `9712a5400175f8beacb215cefed1dad6935627df` (2026-10-16) |
 | License | AGPL-3.0-or-later |
 
-The first commit in this repository contains the upstream files unmodified, so
-`git diff <first-commit> -- web/js` shows every change made here.
+The `upstream` branch holds the mirrored upstream files unmodified (except
+that `?v=` cache-busting query strings are stripped from JS imports), and
+`upstream.json` records the upstream commit last merged. `git diff upstream --
+web/js web/css` shows every change made here. See docs/UPSTREAM-SYNC.md.
 
 ## Files taken from upstream
 

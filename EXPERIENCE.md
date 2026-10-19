@@ -177,3 +177,23 @@ changing code; add to it when something costs you time. Group by area.
 - Class-name trap: a field `<label class="oe-opt oe-opt-range">` wrapping
   `<input class="oe-opt-range">` styled the label as a 96px slider. Use a
   modifier (`oe-opt--range`) for containers.
+
+## Following upstream (vendor branch)
+
+- Mirrored files are merged, not copied: `tools/upstream-sync.py` commits the
+  new upstream files onto the `upstream` branch and runs
+  `git merge --no-ff --no-commit upstream`. Git's 3-way merge applies upstream
+  changes on top of ours; only real overlaps conflict.
+- The vendor branch stores files with `?v=` query strings already stripped.
+  Otherwise every upstream cache-busting bump on an import line would
+  conflict with our stripped line. Verified in a simulated update: a `?v=`
+  bump merged cleanly; a changed line we had also changed conflicted.
+- Typical conflicts: import blocks (both sides add imports at the same spot:
+  keep both) and lines we deliberately changed (keep ours, port upstream's
+  intent).
+- A fresh clone has only `origin/upstream`; the script creates the local
+  branch from it. Pushing must include the branch: `git push origin main upstream`.
+- `--check` creates the local `upstream` branch if it is missing but changes
+  nothing else.
+- The report's shim check counts only calls (`alias.fn(`): matching
+  `alias.word` also caught `modalManager.js` in the import path.

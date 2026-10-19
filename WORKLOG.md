@@ -2,6 +2,28 @@
 
 Newest entry first. Each entry: what changed, how it was verified, what is left.
 
+## 2026-10-19 (end): process for following upstream Odysseus
+
+**Done** (the user will not maintain this by hand; an agent should be able to
+update it from a newer Odysseus checkout)
+- `tools/upstream-sync.py`: vendor-branch sync (`upstream` branch +
+  `git merge --no-commit`), `upstream.json`, CSS regeneration, and a report:
+  conflicts, missing imports, `/api` paths the server lacks, missing shim
+  functions, upstream backend diff to port. `--check` mode changes nothing.
+- Baseline: `upstream` branch now = mirrored files @9712a54 (normalized),
+  merged into main (no content change).
+- `docs/UPSTREAM-SYNC.md`: the runbook for agents (conflict rules, report
+  handling, backend mapping, verification, ledger of our changes).
+
+**Verified**
+- Simulated an upstream update in scratch clones (plain change, change on a
+  line we modified, `?v=` bump, new file, deleted file, new external import,
+  new shim call, new API, backend change). Result: one conflicting file with
+  two hunks (imports, session key); `?v=` bump merged cleanly; the report
+  listed the missing imports, the unserved `/api/image/sparkle`, the missing
+  `ui.showNotice` and the backend diff.
+- `--check` on the real repo: nothing to change.
+
 ## 2026-10-19 (late night): Photoshop-style header
 
 **Done** (user chose "menu bar + options bar"; no Move tool changes)
