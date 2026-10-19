@@ -2,6 +2,14 @@
 
 Newest entry first. Each entry: what changed, how it was verified, what is left.
 
+## 2026-10-19 (end, 2): published to GitHub
+
+- Remote `origin` = https://github.com/AbdulOhab/odysseus-edit (public).
+  Pushed `main` and `upstream` (the vendor branch must always be pushed too:
+  `git push origin main upstream`).
+- Checked before pushing: clean tree; `.env` and `config/providers.toml` never
+  committed; no key-like strings in history apart from the fake test keys.
+
 ## 2026-10-19 (end): process for following upstream Odysseus
 
 **Done** (the user will not maintain this by hand; an agent should be able to
