@@ -14,13 +14,17 @@ come from the provider config and never from the request.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
+import logging
 import re
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_TIMEOUT = httpx.Timeout(90.0, connect=10.0)
@@ -91,17 +95,42 @@ def _raise_for_status(provider_name: str, response: httpx.Response) -> None:
     if status in (401, 403):
         raise LLMError(f"{provider_name} rejected the API key ({status}): {detail}", 502)
     if status == 429:
-        raise LLMError(f"{provider_name} rate limit or quota reached: {detail}", 429)
+        raise LLMError(f"{provider_name} is rate limiting requests (still busy after retrying). "
+                       f"Wait a minute and try again. Vendor says: {detail}", 429)
     raise LLMError(f"{provider_name} returned {status}: {detail}", 502)
 
 
-async def _post(client: httpx.AsyncClient, provider_name: str, url: str, **kwargs) -> httpx.Response:
+# Rate limits (429) and overload (503, 529) are often momentary: Z.ai answers
+# a burst of requests with 429 "[1302] Rate limit reached". Wait and retry a
+# couple of times before giving up. Retry-After wins when the vendor sends it.
+RETRY_STATUSES = frozenset({429, 503, 529})
+RETRY_DELAYS = (2.0, 5.0)
+MAX_RETRY_AFTER = 10.0
+_sleep = asyncio.sleep
+
+
+def _retry_delay(response: httpx.Response, attempt: int) -> float:
+    header = response.headers.get("retry-after", "")
     try:
-        return await client.post(url, **kwargs)
-    except httpx.TimeoutException as exc:
-        raise LLMError(f"{provider_name} did not answer in time.", 504) from exc
-    except httpx.HTTPError as exc:
-        raise LLMError(f"Could not reach {provider_name}: {exc.__class__.__name__}", 502) from exc
+        return min(MAX_RETRY_AFTER, max(0.0, float(header)))
+    except ValueError:
+        return RETRY_DELAYS[attempt]
+
+
+async def _post(client: httpx.AsyncClient, provider_name: str, url: str, **kwargs) -> httpx.Response:
+    for attempt in range(len(RETRY_DELAYS) + 1):
+        try:
+            response = await client.post(url, **kwargs)
+        except httpx.TimeoutException as exc:
+            raise LLMError(f"{provider_name} did not answer in time.", 504) from exc
+        except httpx.HTTPError as exc:
+            raise LLMError(f"Could not reach {provider_name}: {exc.__class__.__name__}", 502) from exc
+        if response.status_code not in RETRY_STATUSES or attempt == len(RETRY_DELAYS):
+            return response
+        delay = _retry_delay(response, attempt)
+        logger.info("%s returned %s; retrying in %.1fs", provider_name, response.status_code, delay)
+        await _sleep(delay)
+    return response
 
 
 async def _chat_anthropic(client, provider, model, system, user_text, image, max_tokens, temperature) -> ChatResult:

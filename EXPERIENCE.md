@@ -124,5 +124,12 @@ changing code; add to it when something costs you time. Group by area.
 - Newer OpenAI reasoning models reject `max_tokens`/`temperature`; the client
   retries once with `max_completion_tokens` and without temperature.
 - The canvas preview is sent only to providers with the `vision` capability.
+- **Z.ai rate-limits bursts hard:** a handful of requests in a few seconds
+  gets HTTP 429 `[1302] Rate limit reached for requests`. `llm._post` retries
+  429/503/529 twice (2 s, 5 s, or Retry-After). Don't hammer a user's key
+  while debugging; one request at a time. A real call takes 5-10 s.
+- **"It does nothing" usually means the result was easy to miss.** Planner
+  errors and empty plans now raise a toast, not only the small status line.
+  Adjustments on a blank white canvas also look like nothing happened.
 - For end-to-end tests without a real key, a 40-line mock of `/v1/messages`
   (Anthropic format) is enough; point a provider's `base_url` at it.

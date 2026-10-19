@@ -986,7 +986,12 @@ function _wireAiCommandBox() {
           preview: choice.vision ? _quickEditPreview() : null,
         });
         if (!plan.actions.length) {
-          _setAiCommandStatus(plan.message || 'No edit matched that request.', plan.message ? 'done' : 'error');
+          // The model answered but planned nothing (a question, or an edit
+          // this install cannot do). Say so loudly: the status line is easy
+          // to miss.
+          const reply = plan.message || 'The model did not suggest any edit for that request.';
+          _setAiCommandStatus(reply, 'error');
+          if (uiModule) uiModule.showToast(`${choice.model}: ${reply}`, 7000);
           return;
         }
         await _runQuickEditActions(plan.actions, runBtn, { summary: plan.message });
@@ -996,13 +1001,16 @@ function _wireAiCommandBox() {
       await _runQuickEditActions(matchQuickEditCommand(p, prompt, { strict: false }), runBtn);
     } catch (err) {
       console.error('[ge-ai-command] failed', err);
-      _setAiCommandStatus(err?.message || 'AI edit failed', 'error');
-      if (err?.helpTopic && uiModule) {
-        uiModule.showToast(err.message, {
+      const message = err?.message || 'AI edit failed';
+      _setAiCommandStatus(message, 'error');
+      if (uiModule && err?.helpTopic) {
+        uiModule.showToast(message, {
           duration: 8000,
           action: 'How to enable',
           onAction: () => host.showSetupHelp(err.helpTopic),
         });
+      } else if (uiModule) {
+        uiModule.showToast(message, { duration: 8000, error: true });
       }
     } finally {
       setBusy(false);

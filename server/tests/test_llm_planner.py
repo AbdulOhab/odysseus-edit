@@ -97,14 +97,53 @@ def test_anthropic_error_message_is_surfaced_without_key():
     asyncio.run(scenario())
 
 
-def test_rate_limit_maps_to_429():
+def test_rate_limit_retries_then_maps_to_429(llm_sleeps):
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(429, json={"error": {"code": "1302", "message": "Rate limit reached for requests"}})
+
     async def scenario():
-        async with client_for(lambda r: httpx.Response(429, json={"error": {"message": "slow down"}})) as client:
+        async with client_for(handler) as client:
             with pytest.raises(llm.LLMError) as info:
                 await llm.chat(provider(), "glm-5.3", "S", "u", client=client)
         assert info.value.status_code == 429
+        assert "Rate limit reached" in str(info.value)
 
     asyncio.run(scenario())
+    assert len(calls) == 1 + len(llm.RETRY_DELAYS)
+    assert llm_sleeps == list(llm.RETRY_DELAYS)
+
+
+def test_rate_limit_recovers_after_retry(llm_sleeps):
+    replies = [
+        httpx.Response(429, headers={"retry-after": "1"}, json={"error": {"message": "busy"}}),
+        httpx.Response(200, json={"content": [{"type": "text", "text": "ok"}]}),
+    ]
+
+    async def scenario():
+        async with client_for(lambda r: replies.pop(0)) as client:
+            return await llm.chat(provider(), "glm-5.3", "S", "u", client=client)
+
+    assert asyncio.run(scenario()).text == "ok"
+    assert llm_sleeps == [1.0]
+
+
+def test_auth_errors_are_not_retried(llm_sleeps):
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(401, json={"error": {"message": "bad key"}})
+
+    async def scenario():
+        async with client_for(handler) as client:
+            with pytest.raises(llm.LLMError):
+                await llm.chat(provider(), "glm-5.3", "S", "u", client=client)
+
+    asyncio.run(scenario())
+    assert len(calls) == 1 and llm_sleeps == []
 
 
 def test_timeout_maps_to_504():

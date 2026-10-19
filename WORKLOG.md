@@ -2,6 +2,29 @@
 
 Newest entry first. Each entry: what changed, how it was verified, what is left.
 
+## 2026-10-19 (evening): "glm-5.3-flash does nothing"
+
+**Found**
+- The user's server, config and key were fine: `/api/ai/command` with
+  glm-5.3-flash returned plans in ~5 s and the browser added the layers.
+- After two quick calls, Z.ai answered every request with 429
+  `[1302] Rate limit reached for requests`. The editor showed this only in the
+  Quick Edit status line, so it looked like nothing happened.
+
+**Done**
+- `server/app/llm.py`: retry 429/503/529 twice with backoff (Retry-After
+  honoured); clearer rate-limit message. Tests for retry, recovery and no
+  retry on auth errors (154 passed).
+- Quick Edit shows a toast for planner errors and for replies with no edit.
+
+**Verified**
+- Patched server on a spare port: Bengali prompt with glm-5.3-flash returned a
+  Bengali message and two actions (brightness, vibrance), HTTP 200.
+
+**Left**
+- The user must restart their server (`Ctrl+C`, `uv run odysseus-edit`) to
+  get the retry.
+
 ## 2026-10-19 (later): AI server and multi-vendor Quick Edit
 
 **Done**

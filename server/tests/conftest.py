@@ -12,6 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
+from app import llm
 from app.config import parse_settings
 from app.main import create_app
 from app.services import local_tools
@@ -130,3 +131,15 @@ def client(settings, web_dir, recorder):
     app = create_app(settings, web_dir=web_dir, http_transport=httpx.MockTransport(recorder))
     with TestClient(app, base_url="http://127.0.0.1:7020") as c:
         yield c
+
+
+@pytest.fixture(autouse=True)
+def llm_sleeps(monkeypatch):
+    """LLM retries back off with asyncio.sleep; record the delays instead of waiting."""
+    delays: list[float] = []
+
+    async def fake_sleep(seconds):
+        delays.append(seconds)
+
+    monkeypatch.setattr(llm, "_sleep", fake_sleep)
+    return delays
