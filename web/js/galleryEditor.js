@@ -2,10 +2,10 @@
  * Gallery Editor — canvas-based image editor with layers, brush, eraser, text, crop, inpaint mask.
  */
 
-import uiModule from './ui.js?v=20260916largetoolscroll1';
+import uiModule from './ui.js';
 import dragSortModule from './dragSort.js';
 import spinnerModule from './spinner.js';
-import { attachColorPicker } from './colorPicker.js?v=20260910eyedropper1';
+import { attachColorPicker } from './colorPicker.js';
 import modalManager from './modalManager.js';
 import { canvasCoords as _canvasCoords } from './editor/canvas-coords.js';
 import { drawCheckerboard as _drawCheckerboard } from './editor/checkerboard.js';
@@ -72,12 +72,12 @@ import {
   drawAdjustmentLayerAsync as _drawAdjustmentLayerAsync,
   normalizeAdjustmentData as _normalizeAdjustmentData,
 } from './editor/adjustment-layer.js';
-import { buildToolbar as _buildToolbar } from './editor/build/toolbar.js?v=20260830editor2';
+import { buildToolbar as _buildToolbar } from './editor/build/toolbar.js';
 import { buildTopbar as _buildTopbar, buildZoomFooter as _buildZoomFooter } from './editor/build/topbar.js';
 import {
   controlsHTML as _controlsHTML,
   layerPanelHTML as _layerPanelHTML,
-} from './editor/build/controls.js?v=20260830editor2';
+} from './editor/build/controls.js';
 import {
   transformPopupHTML as _transformPopupHTML,
   attachSpinRepeat as _attachSpinRepeat,
@@ -176,14 +176,14 @@ import { createShortcutsPopover } from './editor/shortcuts-popover.js';
 import { wireKeyboardShortcuts } from './editor/keyboard-shortcuts.js';
 import { wireClipboardAndDrop } from './editor/clipboard-and-drop.js';
 import { wireAIModelSelectors, resolveInpaintModel } from './editor/ai-models.js';
-import { wireInpaintButtons } from './editor/ai-inpaint.js?v=20260708match1';
+import { wireInpaintButtons } from './editor/ai-inpaint.js';
 import { wireAIToolsMisc } from './editor/ai-tools-misc.js';
 import { wireRembgAndSharpen } from './editor/ai-rembg.js';
 import { wireStrokeToolSliders } from './editor/stroke-tool-sliders.js';
 import { wireImport } from './editor/wire-import.js';
 import { wireMergeButtons } from './editor/wire-merge-buttons.js';
 import { wireSelectionControls } from './editor/wire-selection-controls.js';
-import { wireInpaintControls } from './editor/wire-inpaint-controls.js?v=20260708match1';
+import { wireInpaintControls } from './editor/wire-inpaint-controls.js';
 import { wireTopbar, closeOtherTopbarMenus as _closeOtherTopbarMenus } from './editor/wire-topbar.js';
 import { wireTopbarOverflow } from './editor/wire-topbar-overflow.js';
 import { wireTopbarMenus } from './editor/wire-topbar-menus.js';
